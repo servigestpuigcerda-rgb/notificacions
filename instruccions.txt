@@ -1,0 +1,48 @@
+======================================================
+  COM USAR L'ASSISTENT DE COMPRA BONPREUESCLAT
+======================================================
+
+REQUISITS PREVIS (fer una sola vegada):
+----------------------------------------
+1. Tenir Python 3.8 o superior instal·lat
+2. Executar a la terminal:
+
+   pip install -r requirements.txt
+   playwright install chromium
+
+CONFIGURACIÓ DE LES CREDENCIALS (opcional):
+--------------------------------------------
+1. Copia el fitxer .env.example i anomena'l .env:
+   cp .env.example .env
+
+2. Edita .env amb el teu email i contrasenya d'Esclat Online
+
+   (Si no fas això, pots iniciar sessió manualment al navegador
+    quan s'obri)
+
+COM EXECUTAR:
+--------------
+Opció A - Mode interactiu (t'anirà preguntant):
+   python compra_esclat.py
+
+Opció B - Passar productes directament:
+   python compra_esclat.py "llet desnatada" "pa de motlle" "ous" "tomàquets"
+
+QUÈ FA EL PROGRAMA:
+---------------------
+1. Obre el navegador Chrome automàticament
+2. Va a BonpreuEsclat Online
+3. Inicia sessió (amb .env) o espera que ho facis tu
+4. Per cada producte:
+   - Fa la cerca
+   - Et mostra fins a 5 resultats amb preu
+   - Tu tries quin vols afegir (o el saltes)
+5. Al final obre el carro per que confirmes la comanda
+
+IMPORTANT:
+-----------
+- La comanda final la confirmes tu al navegador
+- El programa mai fa la comanda sense la teva confirmació
+- Les credencials es guarden NOMÉS al teu ordinador (.env)
+
+======================================================
