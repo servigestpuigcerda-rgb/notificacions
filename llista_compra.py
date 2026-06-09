@@ -1,51 +1,64 @@
 #!/usr/bin/env python3
 """
-Obre les cerques de la llista de la compra directament al navegador.
+Obre els productes de la llista de la compra directament al navegador.
 Executa: python llista_compra.py
 """
 
 import webbrowser
-import urllib.parse
-import time
+
+BASE = "https://www.compraonline.bonpreuesclat.cat"
 
 PRODUCTES = [
-    "paper higiènic",
-    "paper de cuina",
-    "coca-cola",
-    "font vella aigua",
-    "tomàquet",
-    "ous",
+    {
+        "nom": "Paper higiènic — BONPREU 2 capes 12 rotlles",
+        "url": f"{BASE}/products/bonpreu-paper-higi%C3%A8nic-2-capes-12-un/08673",
+    },
+    {
+        "nom": "Paper de cuina — BONPREU",
+        "url": f"{BASE}/products/bonpreu-paper-de-cuina/27101",
+    },
+    {
+        "nom": "Coca-Cola — Refresc de cola en llauna",
+        "url": f"{BASE}/products/coca-cola-refresc-de-cola-en-llauna/81602",
+    },
+    {
+        "nom": "Font Vella — Aigua mineral 6x1,5 L",
+        "url": f"{BASE}/products/font-vella-aigua-mineral-natural-6x1-5-l/45111",
+    },
+    {
+        "nom": "Tomàquet — Frescos (categoria)",
+        "url": f"{BASE}/categories/frescos/fruites-i-verdures/verdures-i-hortalisses/tom%C3%A0quets/9db034eb-1914-4b66-94a9-29160b0e651c",
+    },
+    {
+        "nom": "Ous frescos — Classe L/XL",
+        "url": f"{BASE}/products/bonpreu-ous-frescos-classe-l-xl/01861",
+    },
 ]
 
-BASE_CERCA = "https://www.compraonline.bonpreuesclat.cat/search?q="
-
 def main():
-    print("\n" + "="*55)
+    print("\n" + "="*58)
     print("  LLISTA DE LA COMPRA - BonpreuEsclat Online")
-    print("="*55)
-    print(f"\n  {len(PRODUCTES)} productes a cercar:\n")
+    print("="*58)
+    print(f"\n  {len(PRODUCTES)} productes:\n")
     for i, p in enumerate(PRODUCTES, 1):
-        print(f"  {i}. {p.capitalize()}")
+        print(f"  {i}. {p['nom']}")
 
-    print("\n" + "-"*55)
-    print("  S'obrirà el navegador amb cada cerca.")
-    print("  Afegeix el producte al carro i torna aquí.")
-    print("-"*55)
+    print("\n" + "-"*58)
+    print("  S'obrirà cada producte al navegador.")
+    print("  Afegeix-lo al carro i torna aquí per al següent.")
+    print("-"*58)
     input("\n  Prem Enter per començar...\n")
 
     for i, producte in enumerate(PRODUCTES, 1):
-        url = BASE_CERCA + urllib.parse.quote(producte)
-        print(f"  [{i}/{len(PRODUCTES)}] Cercant: {producte.capitalize()}")
-        print(f"         URL: {url}")
-        webbrowser.open(url)
-        input("  → Afegeix al carro i prem Enter per al següent...\n")
+        print(f"  [{i}/{len(PRODUCTES)}] {producte['nom']}")
+        webbrowser.open(producte["url"])
+        input("  → Afegit al carro? Prem Enter per al següent...\n")
 
-    print("="*55)
+    print("="*58)
     print("  Tots els productes processats!")
-    print("  Ves al carro per confirmar i finalitzar la comanda:")
-    print("  https://www.compraonline.bonpreuesclat.cat/cart")
-    print("="*55 + "\n")
-    webbrowser.open("https://www.compraonline.bonpreuesclat.cat/cart")
+    print("  Obrint el carro per finalitzar la comanda...")
+    print("="*58 + "\n")
+    webbrowser.open(f"{BASE}/cart")
 
 if __name__ == "__main__":
     main()
