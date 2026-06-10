@@ -1,4 +1,33 @@
 ======================================================
+  INTEGRACIÓ AMB STRAVA
+======================================================
+
+CONFIGURACIÓ PRÈVIA (una sola vegada):
+----------------------------------------
+1. Crea una aplicació a Strava:
+   https://www.strava.com/settings/api
+   - Nom: el que vulguis (ex: "Les meves activitats")
+   - Tipus de categoria: "Other"
+   - Lloc web: http://localhost
+   - Authorization Callback Domain: localhost
+
+2. Copia el "Client ID" i "Client Secret" de l'aplicació
+
+COM EXECUTAR:
+--------------
+   python strava.py
+
+El programa t'obrirà el navegador per autoritzar l'accés.
+Un cop autoritzat, els tokens es desen automàticament al .env
+i no caldrà tornar a autoritzar (es renova sol).
+
+QUÈ FA EL PROGRAMA:
+---------------------
+- Mostra les teves últimes activitats (curses, bicicleta, etc.)
+- Filtra per tipus d'activitat
+- Mostra distància, temps, ritme, desnivell i FC
+
+======================================================
   COM USAR L'ASSISTENT DE COMPRA BONPREUESCLAT
 ======================================================
 
