@@ -46,3 +46,51 @@ IMPORTANT:
 - Les credencials es guarden NOMÉS al teu ordinador (.env)
 
 ======================================================
+
+
+======================================================
+  COM USAR LA INTEGRACIÓ AMB MICROSOFT PLANNER
+======================================================
+
+REQUISITS PREVIS (fer una sola vegada):
+----------------------------------------
+1. Tenir Python 3.8 o superior instal·lat
+2. Executar: pip install -r requirements.txt
+3. Tenir un compte Microsoft (personal o organització)
+
+CONFIGURACIÓ AZURE AD (primera vegada):
+-----------------------------------------
+1. Vés a https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps
+2. Clica 'New registration'
+3. Omple:
+   - Nom: 'Planner Integration' (o el que vulguis)
+   - Account types: 'Accounts in any organizational directory
+     and personal Microsoft accounts'
+   - Redirect URI: Web → http://localhost:8766/callback
+4. Clica 'Register'
+5. Copia l'Application (client) ID
+6. A 'API permissions' → 'Add a permission' → 'Microsoft Graph'
+   → 'Delegated permissions' → cerca 'Tasks.ReadWrite' → afegeix
+7. Clica 'Grant admin consent' si el botó és disponible
+
+COM EXECUTAR:
+--------------
+   python planner.py
+
+QUÈ FA EL PROGRAMA:
+---------------------
+1. La primera vegada et demana el Client ID d'Azure AD
+2. Obre el navegador per autoritzar l'accés
+3. Un cop autenticat, mostra un menú amb:
+   - Veure les teves tasques pendents
+   - Veure tasques per pla concret
+   - Crear tasques noves
+   - Marcar tasques com a completades
+
+NOTES:
+-------
+- Els tokens es desen a .env i es renoven automàticament
+- Les tasques es llegeixen de Microsoft Planner (no To Do)
+- Necessites tenir almenys un pla de Planner accessible
+
+======================================================
