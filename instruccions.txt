@@ -20,6 +20,27 @@ CONFIGURACIÓ DE LES CREDENCIALS (opcional):
    (Si no fas això, pots iniciar sessió manualment al navegador
     quan s'obri)
 
+CONFIGURACIÓ DE MICROSOFT PLANNER (opcional):
+----------------------------------------------
+Si vols que el programa creï automàticament una tasca a Microsoft Planner
+amb la llista de productes comprats, afegeix al fitxer .env:
+
+  PLANNER_TENANT_ID    → ID del teu tenant d'Azure AD
+  PLANNER_CLIENT_ID    → ID de l'aplicació registrada a Azure
+  PLANNER_CLIENT_SECRET → Secret de l'aplicació
+  PLANNER_PLAN_ID      → ID del pla de Planner on crear les tasques
+  PLANNER_BUCKET_ID    → (opcional) ID del bucket/columna del pla
+
+Per obtenir aquests valors:
+  1. Ves a portal.azure.com → Azure Active Directory → Registres d'aplicació
+  2. Crea una nova aplicació o usa una d'existent
+  3. A "Permisos d'API" afegeix: Tasks.ReadWrite (aplicació) de Microsoft Graph
+  4. Genera un secret a "Certificats i secrets"
+  5. L'ID del pla el trobes a la URL de Planner:
+     https://tasks.office.com/.../plans/<PLAN_ID>/...
+
+Si no configures el Planner, el programa funciona igualment sense crear tasques.
+
 COM EXECUTAR:
 --------------
 Opció A - Mode interactiu (t'anirà preguntant):

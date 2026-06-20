@@ -9,6 +9,7 @@ import sys
 import time
 from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
+from planner import crear_tasca_planner
 
 load_dotenv()
 
@@ -195,6 +196,7 @@ def main():
     password = os.getenv("ESCLAT_PASSWORD", "")
 
     carro = []
+    saltats = []
 
     with sync_playwright() as p:
         print("\n  Obrint el navegador...")
@@ -241,6 +243,7 @@ def main():
                 else:
                     print("  No s'ha pogut afegir automàticament.")
             elif opcio == 0:
+                saltats.append(producte)
                 print(f"  '{producte}' saltat.")
 
         # Obrir el carro al final
@@ -251,6 +254,9 @@ def main():
             pass
 
         resum_final(carro)
+
+        # Crear tasca a Microsoft Planner (si està configurat)
+        crear_tasca_planner(carro, saltats if saltats else None)
 
         input("  Prem Enter per tancar el navegador quan hagis acabat...")
         browser.close()
