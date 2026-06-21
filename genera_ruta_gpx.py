@@ -36,33 +36,33 @@ def interpolate_segment(p1, p2, steps):
     return pts
 
 def generate_route():
-    # Punt de partida: aparcament Sant Marçal, Montseny
-    # Ruta: pujada al Turó de l'Home (~1706m) i volta
+    # Punt de partida: Estavar, Cerdanya (~1230m)
+    # Ruta: pujada cap al nord pels turons sobre Estavar fins ~1930m
     segments = [
-        # (bearing, dist_m, ele_final)  — definim keypoints de la ruta
-        # Pujada (~7.5 km, +700m)
-        (25, 1000,  985),   # camí inicial suau
-        (15,  900, 1065),   # arrenca la pujada
-        (30, 1200, 1185),   # pujada constant
-        (20,  900, 1285),   # tram més vertical
-        (10,  700, 1375),   # cresta
-        (35, 1100, 1465),   # travessa de cresta
-        (15,  700, 1545),   # últim repte
-        (25,  600, 1610),   # zona de cim
-        (5,   400, 1620),   # al cim (~1620m)
-        # Descens diferent (~7.5 km, -700m)
-        (200,  700, 1540),  # inici baixada W
-        (210,  900, 1440),  # baixada ràpida
-        (195, 1050, 1330),  # travessa bosc
-        (220,  900, 1230),  # soleia
-        (205, 1050, 1120),  # vall
-        (215,  900, 1030),  # fons de vall
-        (190,  700,  980),  # camí de retorn
-        (185,  900,  930),  # últims metres
-        (175,  500,  920),  # tancament del loop
+        # (bearing, dist_m, ele_final)
+        # Pujada (~7.5 km, +700m) — cap al nord/NW pels corriols
+        (340,  950, 1290),  # sortida del poble cap al nord
+        (320, 1050, 1380),  # pista forestal, pujada suau
+        (305, 1170, 1480),  # corriol que guanya alçada
+        (315,  940, 1570),  # tram més pronunciat
+        (330,  820, 1660),  # cresta intermèdia
+        (310, 1050, 1760),  # travessa de carena
+        (325,  700, 1840),  # últim tram d'ascens
+        (340,  580, 1900),  # zona de cim
+        (355,  350, 1930),  # punt màxim (~1930m)
+        # Descens (~7.5 km, -700m) — volta per l'est
+        (80,   580, 1870),  # inici descens cap a l'est
+        (110,  820, 1780),  # baixada per carena E
+        (125, 1050, 1670),  # corriol de descens
+        (135,  940, 1560),  # pla intermedi
+        (150, 1170, 1440),  # vall de retorn
+        (160, 1050, 1340),  # fons de vall
+        (170,  820, 1275),  # darrer tram
+        (180,  580, 1245),  # entrada al poble
+        (190,  350, 1230),  # tancament loop Estavar
     ]
 
-    lat, lon, ele = 41.7834, 2.4021, 920.0
+    lat, lon, ele = 42.4789, 2.0453, 1230.0
     keypoints = [(lat, lon, ele)]
 
     for bearing, dist, ele_final in segments:
@@ -99,12 +99,12 @@ def generate_route():
     })
 
     metadata = ET.SubElement(gpx, "metadata")
-    ET.SubElement(metadata, "name").text = "Ruta Montseny - Turó de l'Home 15km 700D+"
-    ET.SubElement(metadata, "desc").text = "Circular des de Sant Marçal fins al Turó de l'Home. 15km aprox, 700m D+."
+    ET.SubElement(metadata, "name").text = "Ruta Estavar - Cerdanya 15km 700D+"
+    ET.SubElement(metadata, "desc").text = "Circular des d'Estavar pujant als turons del nord. 15km aprox, 700m D+. Trail running."
     ET.SubElement(metadata, "time").text = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 
     trk = ET.SubElement(gpx, "trk")
-    ET.SubElement(trk, "name").text = "Montseny - Turó de l'Home"
+    ET.SubElement(trk, "name").text = "Estavar - Trail Cerdanya 15km 700D+"
     ET.SubElement(trk, "type").text = "trail running"
     trkseg = ET.SubElement(trk, "trkseg")
 
@@ -117,7 +117,7 @@ def generate_route():
     reparsed = minidom.parseString(raw)
     pretty = reparsed.toprettyxml(indent="  ", encoding="UTF-8")
 
-    filename = "ruta_montseny_15km_700d.gpx"
+    filename = "ruta_estavar_15km_700d.gpx"
     with open(filename, "wb") as f:
         f.write(pretty)
 
