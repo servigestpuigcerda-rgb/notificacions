@@ -88,7 +88,7 @@ def authorize():
         "redirect_uri": REDIRECT_URI,
         "response_type": "code",
         "approval_prompt": "auto",
-        "scope": "read,activity:read_all,profile:read_all",
+        "scope": "read,read_all,activity:read_all,profile:read_all",
     }
     auth_url = f"{STRAVA_AUTH_URL}?{urllib.parse.urlencode(params)}"
     print(f"\nObrint el navegador per autoritzar Strava...")
@@ -140,6 +140,47 @@ def get_stats(athlete_id):
     return api_get(f"/athletes/{athlete_id}/stats")
 
 
+def get_routes(athlete_id, per_page=20, page=1):
+    return api_get(f"/athletes/{athlete_id}/routes", {"per_page": per_page, "page": page})
+
+
+def get_route(route_id):
+    return api_get(f"/routes/{route_id}")
+
+
+def export_route_gpx(route_id, filename=None):
+    token = get_valid_token()
+    headers = {"Authorization": f"Bearer {token['access_token']}"}
+    resp = requests.get(f"{STRAVA_API_BASE}/routes/{route_id}/export_gpx", headers=headers)
+    resp.raise_for_status()
+    if not filename:
+        filename = f"ruta_{route_id}.gpx"
+    with open(filename, "wb") as f:
+        f.write(resp.content)
+    return filename
+
+
+def create_route(name, description, athlete_id, route_type, sub_type, waypoints=None, private=True, estimated_moving_time=None):
+    token = get_valid_token()
+    headers = {
+        "Authorization": f"Bearer {token['access_token']}",
+        "Content-Type": "application/json",
+    }
+    data = {
+        "name": name,
+        "description": description,
+        "athlete_id": athlete_id,
+        "type": route_type,
+        "sub_type": sub_type,
+        "private": private,
+    }
+    if estimated_moving_time:
+        data["estimated_moving_time"] = estimated_moving_time
+    resp = requests.post(f"{STRAVA_API_BASE}/routes", headers=headers, json=data)
+    resp.raise_for_status()
+    return resp.json()
+
+
 def format_duration(seconds):
     h = seconds // 3600
     m = (seconds % 3600) // 60
@@ -159,6 +200,31 @@ def format_pace(meters, seconds, sport_type):
         return f"{m}:{s:02d} /km"
     km_h = (meters / 1000) / (seconds / 3600)
     return f"{km_h:.1f} km/h"
+
+
+ROUTE_TYPES = {1: "Ciclisme", 2: "Carrera"}
+ROUTE_SUB_TYPES = {1: "Carretera", 2: "MTB", 3: "Ciclocròs", 4: "Trail", 5: "Mixt"}
+
+
+def print_route(route):
+    print(f"\n{'─'*50}")
+    print(f"  {route['name']}")
+    print(f"  ID:         {route['id_str'] if 'id_str' in route else route['id']}")
+    t = ROUTE_TYPES.get(route.get("type"), "Desconegut")
+    st = ROUTE_SUB_TYPES.get(route.get("sub_type"), "")
+    print(f"  Tipus:      {t}{' / ' + st if st else ''}")
+    if route.get("distance"):
+        print(f"  Distància:  {route['distance']/1000:.2f} km")
+    if route.get("elevation_gain"):
+        print(f"  Desnivell:  {route['elevation_gain']:.0f} m")
+    if route.get("estimated_moving_time"):
+        print(f"  Temps est.: {format_duration(route['estimated_moving_time'])}")
+    if route.get("description"):
+        print(f"  Descripció: {route['description']}")
+    if route.get("private"):
+        print(f"  Privada:    Sí")
+    if route.get("starred"):
+        print(f"  Destacada:  Sí")
 
 
 def print_activity(act):
@@ -194,7 +260,11 @@ def main():
         print("  1. Veure últimes activitats")
         print("  2. Veure estadístiques generals")
         print("  3. Veure detalls d'una activitat")
-        print("  4. Sortir")
+        print("  4. Veure les meves rutes")
+        print("  5. Veure detalls d'una ruta")
+        print("  6. Exportar ruta com a GPX")
+        print("  7. Crear nova ruta")
+        print("  8. Sortir")
         opcio = input("\nOpció: ").strip()
 
         if opcio == "1":
@@ -239,6 +309,63 @@ def main():
                 print("ID no vàlid.")
 
         elif opcio == "4":
+            print("\nCarregant les teves rutes...")
+            routes = get_routes(athlete["id"])
+            if not routes:
+                print("No s'han trobat rutes. Crea'n una des de Strava web o amb l'opció 7.")
+            else:
+                print(f"\nTotal: {len(routes)} rutes")
+                for route in routes:
+                    print_route(route)
+            print(f"\n{'─'*50}")
+
+        elif opcio == "5":
+            rid = input("ID de la ruta: ").strip()
+            if rid.isdigit():
+                route = get_route(int(rid))
+                print_route(route)
+            else:
+                print("ID no vàlid.")
+
+        elif opcio == "6":
+            rid = input("ID de la ruta: ").strip()
+            if rid.isdigit():
+                fname = input("Nom del fitxer (deixa buit per defecte): ").strip() or None
+                path = export_route_gpx(int(rid), fname)
+                print(f"\nRuta exportada a: {path}")
+            else:
+                print("ID no vàlid.")
+
+        elif opcio == "7":
+            print("\n--- CREAR NOVA RUTA ---")
+            print("Nota: La creació de rutes via API requereix que Strava aprovi\n"
+                  "l'accés avançat a la teva app. Per crear rutes amb recorregut\n"
+                  "específic, usa strava.com/routes/new o una app GPS.\n")
+            nom = input("Nom de la ruta: ").strip()
+            if not nom:
+                print("Cal un nom.")
+                continue
+            desc = input("Descripció (opcional): ").strip()
+            print("Tipus: 1=Ciclisme  2=Carrera")
+            tipus = input("Tipus [1/2]: ").strip()
+            tipus = int(tipus) if tipus in ("1", "2") else 2
+            print("Subtipus: 1=Carretera  2=MTB  3=Ciclocròs  4=Trail  5=Mixt")
+            subtipus = input("Subtipus [1-5]: ").strip()
+            subtipus = int(subtipus) if subtipus in ("1", "2", "3", "4", "5") else 1
+            privada = input("Privada? [S/n]: ").strip().lower() != "n"
+            try:
+                route = create_route(nom, desc, athlete["id"], tipus, subtipus, private=privada)
+                print(f"\nRuta creada!")
+                print_route(route)
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code == 403:
+                    print("\nError 403: La teva app de Strava no té permís per crear rutes.")
+                    print("Per tenir aquest accés, cal sol·licitar-ho a:")
+                    print("https://www.strava.com/settings/api -> 'Request Extended Access'")
+                else:
+                    print(f"\nError: {e.response.status_code} - {e.response.text}")
+
+        elif opcio == "8":
             print("\nFins aviat!")
             break
         else:
