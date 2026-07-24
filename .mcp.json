@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "teams-sender": {
+      "command": "python",
+      "args": ["teams-mcp/server.py"],
+      "env": {
+        "MS_CLIENT_ID": "${MS_CLIENT_ID}",
+        "MS_TENANT_ID": "${MS_TENANT_ID}"
+      }
+    }
+  }
+}

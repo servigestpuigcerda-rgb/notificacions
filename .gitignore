@@ -2,3 +2,5 @@
 __pycache__/
 *.pyc
 .playwright/
+teams-mcp/token_cache.bin
+teams-mcp/.env
