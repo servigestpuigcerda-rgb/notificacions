@@ -46,3 +46,41 @@ IMPORTANT:
 - Les credencials es guarden NOMÉS al teu ordinador (.env)
 
 ======================================================
+  ENVIAR UN SMS D'AVÍS AMB MRW (mrw_sms.py)
+======================================================
+
+QUÈ FA:
+--------
+Es connecta a l'API oficial de MRW (servei web SAGEC), dóna d'alta un
+enviament i activa la NOTIFICACIÓ per SMS. MRW envia automàticament
+l'SMS d'avís al mòbil del destinatari.
+
+CONFIGURACIÓ (fer una sola vegada):
+------------------------------------
+1. Demana a MRW l'accés al servei web SAGEC. Et donaran:
+   franquícia, codi d'abonat, usuari i contrasenya.
+2. Posa aquestes dades al fitxer .env:
+   MRW_FRANQUICIA, MRW_ABONAT, MRW_USUARI, MRW_CONTRASENYA
+
+COM EXECUTAR:
+--------------
+   python mrw_sms.py \
+       --nom "Joan Garcia" \
+       --telefon "600123456" \
+       --via "Carrer Major" --numero "10" \
+       --cp "17520" --poblacio "Puigcerdà"
+
+OPCIONS ÚTILS:
+---------------
+   --tipus-avis 1   Avís quan es crea l'enviament (emissió)
+   --tipus-avis 3   Avís el dia del repartiment (per defecte)
+   --proves         Fa servir l'entorn de proves de MRW (sagec-test)
+   --referencia     Referència interna de l'enviament
+   --codi-servei    Codi de servei MRW (per defecte 0005)
+
+NOTA:
+------
+- Els codis de servei i de tipus de notificació poden variar segons
+  el teu contracte amb MRW. Confirma'ls amb el manual d'integració SAGEC.
+
+======================================================
