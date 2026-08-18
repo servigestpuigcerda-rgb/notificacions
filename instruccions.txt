@@ -78,6 +78,14 @@ OPCIONS ÚTILS:
    --referencia     Referència interna de l'enviament
    --codi-servei    Codi de servei MRW (per defecte 0005)
 
+COMPROVAR ABANS (recomanat):
+-----------------------------
+Abans de crear cap enviament real, executa el diagnòstic. NO crea res,
+només comprova la connexió, les credencials i l'estructura del servei:
+
+   python mrw_test.py            (producció)
+   python mrw_test.py --proves   (entorn de proves)
+
 NOTA:
 ------
 - Els codis de servei i de tipus de notificació poden variar segons
