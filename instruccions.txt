@@ -46,3 +46,49 @@ IMPORTANT:
 - Les credencials es guarden NOMÉS al teu ordinador (.env)
 
 ======================================================
+
+======================================================
+  COM USAR L'ACCÉS ALS ENVIAMENTS DE MRW
+======================================================
+
+CONFIGURACIÓ (fer una sola vegada):
+------------------------------------
+1. pip install -r requirements.txt
+   playwright install chromium
+
+2. Copia .env.example a .env i posa-hi el teu usuari i
+   contrasenya de l'àrea de clients de MRW:
+
+   MRW_USUARI=el_teu_usuari@exemple.com
+   MRW_CONTRASENYA=la_teva_contrasenya
+
+   El fitxer .env NO es puja mai al repositori.
+
+COM EXECUTAR:
+--------------
+   python enviaments_mrw.py                       -> llista els enviaments
+   python enviaments_mrw.py 0012345678            -> seguiment d'un enviament
+   python enviaments_mrw.py --csv enviaments.csv  -> exporta el llistat a CSV
+   python enviaments_mrw.py --login               -> força tornar a iniciar sessió
+   python enviaments_mrw.py --headless            -> sense finestra de navegador
+
+QUÈ FA EL PROGRAMA:
+---------------------
+1. Obre el navegador i va a l'àrea de clients de MRW
+2. Accepta el bàner de cookies si apareix
+3. Inicia sessió amb les dades del .env
+   - Si no ho aconsegueix (per exemple si hi ha un captcha),
+     s'atura i et deixa iniciar sessió tu mateix a la finestra
+4. Guarda la sessió a .mrw_sessio.json per no haver de tornar
+   a entrar cada vegada (esborra'l amb --login si cal)
+5. Busca el llistat d'enviaments i el mostra per pantalla
+6. Opcionalment ho desa tot en un CSV separat per punt i coma
+
+IMPORTANT:
+-----------
+- Els selectors de la web de MRW són aproximats: si la pàgina
+  canvia, el programa et deixarà navegar manualment i llegirà
+  la taula que tinguis a la pantalla.
+- Les credencials es guarden NOMÉS al teu ordinador (.env)
+
+======================================================
