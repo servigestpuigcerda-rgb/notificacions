@@ -1,0 +1,13 @@
+Desptax Cerdanya le está invitando a una reunión de Zoom programada.
+
+Tema: [C.P. / CTAT NOM DE LA COMUNITAT]
+Hora: [D mmm AAAA HH:MM] Madrid
+
+Únase a la reunión de Zoom
+https://us02web.zoom.us/j/[ID]?pwd=[TOKEN]
+
+Enlace al chat de la reunión
+https://us02web.zoom.us/launch/jc/[ID]
+
+ID de reunión: [___ ____ ____]
+Código de acceso: [______]
