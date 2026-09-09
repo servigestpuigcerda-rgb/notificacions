@@ -1,0 +1,755 @@
+<title>Fitxatge Servigest</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=IBM+Plex+Mono:wght@400;500;600&family=Instrument+Sans:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --ground:#F1F4F0; --surface:#FFFFFF; --surface-2:#F7F9F6;
+    --ink:#141D1A; --ink-2:#3D4A45; --muted:#6B7772; --line:#DCE2DA; --line-soft:#E8EDE5;
+    --pine:#1C6A55; --pine-ink:#FFFFFF; --pine-soft:#E1EFE9;
+    --ochre:#8E6712; --ochre-ink:#FFFFFF; --ochre-soft:#F4EDDA;
+    --indigo:#39567A; --indigo-ink:#FFFFFF; --indigo-soft:#E4EAF2;
+    --red:#9B382A; --red-soft:#F6E4E0;
+    --shadow:0 1px 2px rgba(20,29,26,.06), 0 8px 24px -14px rgba(20,29,26,.35);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ground:#0E1412; --surface:#161E1B; --surface-2:#1B2521;
+      --ink:#E9EEEA; --ink-2:#BDC7C2; --muted:#8A9691; --line:#293430; --line-soft:#212B27;
+      --pine:#4FBF9E; --pine-ink:#08201A; --pine-soft:#12312A;
+      --ochre:#D7AA4E; --ochre-ink:#241B06; --ochre-soft:#2D2512;
+      --indigo:#8FAED4; --indigo-ink:#0F1A26; --indigo-soft:#1A2634;
+      --red:#E28270; --red-soft:#33201C;
+      --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -14px rgba(0,0,0,.8);
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#0E1412; --surface:#161E1B; --surface-2:#1B2521;
+    --ink:#E9EEEA; --ink-2:#BDC7C2; --muted:#8A9691; --line:#293430; --line-soft:#212B27;
+    --pine:#4FBF9E; --pine-ink:#08201A; --pine-soft:#12312A;
+    --ochre:#D7AA4E; --ochre-ink:#241B06; --ochre-soft:#2D2512;
+    --indigo:#8FAED4; --indigo-ink:#0F1A26; --indigo-soft:#1A2634;
+    --red:#E28270; --red-soft:#33201C;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -14px rgba(0,0,0,.8);
+  }
+
+  *{box-sizing:border-box}
+  body{
+    background:var(--ground); color:var(--ink);
+    font-family:"Instrument Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size:16px; line-height:1.5; -webkit-text-size-adjust:100%;
+  }
+  h1,h2,h3{font-family:"Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif; text-wrap:balance; margin:0; font-weight:600}
+  .mono{font-family:"IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace; font-variant-numeric:tabular-nums}
+  button{font:inherit; color:inherit; cursor:pointer}
+  :focus-visible{outline:2px solid var(--pine); outline-offset:2px; border-radius:6px}
+  @media (prefers-reduced-motion: reduce){*{animation:none!important; transition:none!important}}
+
+  .app{max-width:560px; margin:0 auto; padding:0 16px 56px; display:flex; flex-direction:column; gap:18px}
+
+  /* ---- capçalera ---- */
+  .top{
+    position:sticky; top:0; z-index:10; background:var(--ground);
+    padding:14px 0 10px; display:flex; align-items:baseline; gap:12px;
+    border-bottom:1px solid var(--line-soft); margin-bottom:2px;
+  }
+  .brand{display:flex; flex-direction:column; gap:1px; margin-right:auto; min-width:0}
+  .brand b{font-family:"Bricolage Grotesque",sans-serif; font-size:17px; font-weight:700; letter-spacing:-.01em}
+  .brand span{font-size:11px; letter-spacing:.09em; text-transform:uppercase; color:var(--muted)}
+  .rellotge{font-family:"Bricolage Grotesque",sans-serif; font-variant-numeric:tabular-nums; font-size:30px; font-weight:600; letter-spacing:-.02em; line-height:1}
+  .datahdr{font-size:11px; color:var(--muted); text-align:right; letter-spacing:.02em}
+
+  /* ---- pestanyes ---- */
+  .tabs{display:flex; gap:4px; background:var(--surface-2); border:1px solid var(--line); padding:4px; border-radius:12px}
+  .tabs button{
+    flex:1; border:0; background:transparent; color:var(--muted); padding:9px 6px; border-radius:9px;
+    font-size:14px; font-weight:500; transition:background .15s, color .15s;
+  }
+  .tabs button[aria-selected="true"]{background:var(--surface); color:var(--ink); box-shadow:var(--shadow); font-weight:600}
+
+  /* ---- targeta d'estat ---- */
+  .estat{
+    background:var(--surface); border:1px solid var(--line); border-radius:16px; overflow:hidden; box-shadow:var(--shadow);
+  }
+  .estat .qui{display:flex; align-items:center; gap:12px; padding:14px 16px; border-bottom:1px solid var(--line-soft)}
+  .avatar{
+    width:40px; height:40px; flex:0 0 40px; border-radius:11px; display:grid; place-items:center;
+    background:var(--pine-soft); color:var(--pine); font-family:"Bricolage Grotesque",sans-serif; font-weight:700; font-size:15px;
+  }
+  .qui select{
+    flex:1; min-width:0; appearance:none; border:0; background:transparent; color:var(--ink);
+    font:600 17px/1.2 "Instrument Sans", sans-serif; padding:4px 24px 4px 0; cursor:pointer;
+    background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),linear-gradient(135deg,currentColor 50%,transparent 50%);
+    background-position:calc(100% - 11px) calc(50% + 1px), calc(100% - 6px) calc(50% + 1px);
+    background-size:5px 5px,5px 5px; background-repeat:no-repeat;
+  }
+  .qui select option{color:#141D1A; background:#fff}
+
+  .marcador{padding:18px 16px; display:flex; flex-direction:column; gap:14px}
+  .linia-estat{display:flex; align-items:center; gap:10px; flex-wrap:wrap}
+  .pastilla{
+    display:inline-flex; align-items:center; gap:7px; padding:5px 11px 5px 9px; border-radius:999px;
+    font-size:13px; font-weight:600; letter-spacing:.01em;
+  }
+  .pastilla i{width:8px; height:8px; border-radius:50%; background:currentColor; flex:0 0 8px}
+  .p-treballant{background:var(--pine-soft); color:var(--pine)}
+  .p-pausa{background:var(--ochre-soft); color:var(--ochre)}
+  .p-fora{background:var(--surface-2); color:var(--muted)}
+  .p-tancada{background:var(--indigo-soft); color:var(--indigo)}
+  .acumulat{margin-left:auto; text-align:right}
+  .acumulat b{display:block; font-family:"Bricolage Grotesque",sans-serif; font-size:22px; font-weight:600; letter-spacing:-.02em; font-variant-numeric:tabular-nums; line-height:1.1}
+  .acumulat span{font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted)}
+
+  .accions{display:flex; flex-direction:column; gap:9px}
+  .btn-gran{
+    border:0; border-radius:14px; padding:20px 18px; text-align:left;
+    display:flex; align-items:center; gap:14px; transition:transform .1s, filter .15s;
+  }
+  .btn-gran:active{transform:scale(.985)}
+  .btn-gran .txt{display:flex; flex-direction:column; gap:1px; min-width:0}
+  .btn-gran .txt b{font-family:"Bricolage Grotesque",sans-serif; font-size:20px; font-weight:600; letter-spacing:-.01em}
+  .btn-gran .txt span{font-size:12.5px; opacity:.8}
+  .btn-gran .fletxa{margin-left:auto; font-size:20px; opacity:.55}
+  .b-pine{background:var(--pine); color:var(--pine-ink)}
+  .b-indigo{background:var(--indigo); color:var(--indigo-ink)}
+  .btn-sec{
+    border:1px solid var(--line); background:var(--surface-2); border-radius:12px; padding:12px 16px;
+    display:flex; align-items:center; gap:10px; font-size:15px; font-weight:500; color:var(--ink-2);
+  }
+  .btn-sec b{font-weight:600; color:var(--ink)}
+  .btn-sec.ochre{color:var(--ochre); border-color:var(--ochre-soft); background:var(--ochre-soft)}
+  .btn-sec.ochre b{color:var(--ochre)}
+
+  /* ---- seccions ---- */
+  .secc{display:flex; flex-direction:column; gap:10px}
+  .secc > h2{font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); font-family:"Instrument Sans",sans-serif}
+  .caixa{background:var(--surface); border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow)}
+
+  /* ---- cronologia del dia ---- */
+  .crono{list-style:none; margin:0; padding:6px 16px 12px}
+  .crono li{display:grid; grid-template-columns:58px 22px 1fr; align-items:stretch; column-gap:10px; min-height:42px}
+  .crono .h{font-size:14px; color:var(--ink); padding-top:9px}
+  .crono .rail{position:relative; justify-self:center; width:22px}
+  .crono .rail::before{content:""; position:absolute; top:0; bottom:0; left:50%; transform:translateX(-50%); width:2px; background:var(--line)}
+  .crono li:first-child .rail::before{top:9px}
+  .crono li:last-child .rail::before{bottom:calc(100% - 19px)}
+  .crono .punt{position:absolute; top:9px; left:50%; transform:translateX(-50%); width:10px; height:10px; border-radius:50%; border:2px solid var(--surface); z-index:1}
+  .crono .et{padding-top:8px; padding-bottom:8px; font-size:14.5px}
+  .crono .et small{display:block; color:var(--muted); font-size:12px}
+  .c-entrada .punt,.c-represa .punt{background:var(--pine)}
+  .c-pausa .punt{background:var(--ochre)}
+  .c-sortida .punt{background:var(--indigo)}
+  .buit{padding:22px 16px; color:var(--muted); font-size:14.5px; text-align:center}
+
+  /* ---- taula de registre ---- */
+  .mesnav{display:flex; align-items:center; gap:8px}
+  .mesnav b{flex:1; text-align:center; font-family:"Bricolage Grotesque",sans-serif; font-size:16px; font-weight:600}
+  .mesnav button{width:36px; height:36px; border-radius:10px; border:1px solid var(--line); background:var(--surface); display:grid; place-items:center; font-size:16px}
+  .scroller{overflow-x:auto}
+  table{width:100%; border-collapse:collapse; font-size:14px}
+  th,td{padding:9px 12px; text-align:right; white-space:nowrap; border-bottom:1px solid var(--line-soft)}
+  th:first-child,td:first-child{text-align:left}
+  thead th{font-size:10.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); font-weight:600}
+  tbody tr:last-child td{border-bottom:0}
+  tfoot td{border-top:1px solid var(--line); border-bottom:0; font-weight:600; padding-top:11px}
+  td.dia{font-weight:500}
+  td.dia small{display:block; font-weight:400; color:var(--muted); font-size:11.5px; text-transform:capitalize}
+  .obert{color:var(--ochre); font-size:11px; text-transform:uppercase; letter-spacing:.06em}
+
+  /* ---- equip ---- */
+  .equip{list-style:none; margin:0; padding:0}
+  .equip li{display:flex; align-items:center; gap:10px; padding:11px 14px; border-bottom:1px solid var(--line-soft)}
+  .equip li:last-child{border-bottom:0}
+  .equip .nom{flex:1; min-width:0; font-weight:500; overflow:hidden; text-overflow:ellipsis}
+  .equip .nom small{display:block; font-weight:400; font-size:12px; color:var(--muted)}
+  .equip .inactiu .nom{color:var(--muted); text-decoration:line-through}
+  .mini{border:1px solid var(--line); background:var(--surface-2); border-radius:8px; padding:5px 10px; font-size:12.5px; color:var(--ink-2)}
+  .mini.perill{color:var(--red); border-color:var(--red-soft); background:var(--red-soft)}
+  .afegir{display:flex; gap:8px; padding:12px 14px; border-top:1px solid var(--line)}
+  input[type=text]{
+    flex:1; min-width:0; border:1px solid var(--line); background:var(--surface-2); color:var(--ink);
+    border-radius:10px; padding:10px 12px; font:inherit; font-size:15px;
+  }
+  input[type=text]::placeholder{color:var(--muted)}
+  .primari{border:0; background:var(--pine); color:var(--pine-ink); border-radius:10px; padding:10px 16px; font-weight:600; font-size:15px}
+
+  .nota{font-size:12.5px; line-height:1.6; color:var(--muted)}
+  .nota b{color:var(--ink-2); font-weight:600}
+  .peu{border-top:1px solid var(--line); padding-top:14px; display:flex; flex-direction:column; gap:8px}
+  .estat-dades{display:inline-flex; align-items:center; gap:6px; font-size:11.5px; color:var(--muted)}
+  .estat-dades i{width:7px; height:7px; border-radius:50%; background:var(--muted); flex:0 0 7px}
+  .estat-dades.ok i{background:var(--pine)}
+  .avis{background:var(--ochre-soft); color:var(--ochre); border-radius:12px; padding:11px 14px; font-size:13px; line-height:1.5}
+  .toast{
+    position:fixed; left:50%; bottom:20px; transform:translateX(-50%);
+    background:var(--ink); color:var(--ground); padding:11px 18px; border-radius:999px;
+    font-size:14px; font-weight:500; box-shadow:var(--shadow); z-index:50; max-width:calc(100% - 32px);
+  }
+  [hidden]{display:none!important}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <b>Fitxatge</b>
+      <span id="orgNom">Registre horari</span>
+    </div>
+    <div>
+      <div class="rellotge mono" id="rellotge">--:--:--</div>
+      <div class="datahdr" id="dataAvui">&nbsp;</div>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button role="tab" aria-selected="true" data-tab="fitxar">Fitxar</button>
+    <button role="tab" aria-selected="false" data-tab="registre">Registre</button>
+    <button role="tab" aria-selected="false" data-tab="equip">Equip</button>
+  </nav>
+
+  <!-- ============ FITXAR ============ -->
+  <section id="panel-fitxar">
+    <div id="senseEquip" class="caixa" hidden style="padding:22px 18px; display:flex; flex-direction:column; gap:12px">
+      <h2 style="font-size:19px">Encara no hi ha ningú donat d'alta</h2>
+      <p class="nota" style="font-size:14px">Afegeix les persones que han de fitxar a la pestanya <b>Equip</b>. Si primer vols veure com funciona, carrega un equip d'exemple i esborra'l després.</p>
+      <div style="display:flex; gap:8px; flex-wrap:wrap">
+        <button class="primari" id="anarEquip">Afegir treballadors</button>
+        <button class="mini" id="carregarDemo">Carregar exemple</button>
+      </div>
+    </div>
+
+    <div id="zonaFitxar" hidden style="display:flex; flex-direction:column; gap:18px">
+      <div class="estat">
+        <div class="qui">
+          <div class="avatar" id="inicials">--</div>
+          <select id="selTreballador" aria-label="Qui fitxa"></select>
+        </div>
+        <div class="marcador">
+          <div class="linia-estat">
+            <span class="pastilla p-fora" id="pastilla"><i></i><span id="pastillaTxt">Fora de jornada</span></span>
+            <div class="acumulat">
+              <b class="mono" id="acumulat">0:00</b>
+              <span>Avui</span>
+            </div>
+          </div>
+          <div class="accions" id="accions"></div>
+        </div>
+      </div>
+
+      <div class="secc">
+        <h2>Moviments d'avui</h2>
+        <div class="caixa">
+          <ul class="crono" id="crono"></ul>
+          <div class="buit" id="cronoBuit">Cap fitxatge registrat avui.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ REGISTRE ============ -->
+  <section id="panel-registre" hidden>
+    <div class="secc">
+      <div class="mesnav">
+        <button id="mesAnt" aria-label="Mes anterior">‹</button>
+        <b id="mesTitol">—</b>
+        <button id="mesSeg" aria-label="Mes següent">›</button>
+      </div>
+      <div class="caixa scroller">
+        <table>
+          <thead>
+            <tr><th>Dia</th><th>Entrada</th><th>Sortida</th><th>Pauses</th><th>Total</th></tr>
+          </thead>
+          <tbody id="taulaCos"></tbody>
+          <tfoot id="taulaPeu"></tfoot>
+        </table>
+        <div class="buit" id="taulaBuida" hidden>Cap fitxatge aquest mes.</div>
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap">
+        <button class="mini" id="exportaCsv">Exportar CSV del mes</button>
+        <button class="mini" id="canviaPersona">Veure una altra persona</button>
+      </div>
+      <p class="nota">
+        <b>Conservació.</b> L'article 34.9 de l'Estatut dels Treballadors obliga a guardar el registre diari de
+        jornada durant <b>4 anys</b> i a tenir-lo a disposició de la persona treballadora, dels seus representants
+        i de la Inspecció de Treball. Exporta el CSV cada mes i arxiva'l.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ EQUIP ============ -->
+  <section id="panel-equip" hidden>
+    <div class="secc">
+      <h2>Qui pot fitxar</h2>
+      <div class="caixa">
+        <ul class="equip" id="llistaEquip"></ul>
+        <div class="buit" id="equipBuit" hidden>Encara no hi ha ningú a la llista.</div>
+        <form class="afegir" id="formAfegir">
+          <input type="text" id="nouNom" placeholder="Nom i cognom" autocomplete="off" maxlength="60">
+          <button class="primari" type="submit">Afegir</button>
+        </form>
+      </div>
+      <p class="nota">
+        Donar de baixa una persona la treu del selector de fitxatge però <b>manté tot el seu històric</b>.
+        Esborrar-la elimina també els seus registres i no es pot desfer.
+      </p>
+    </div>
+  </section>
+
+  <footer class="peu">
+    <span class="estat-dades" id="estatDades"><i></i><span>Comprovant l'emmagatzematge…</span></span>
+    <p class="nota" id="notaDades"></p>
+  </footer>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(() => {
+  "use strict";
+
+  const TIPUS = {
+    entrada: { et:"Entrada",  sub:"Comença la jornada" },
+    pausa:   { et:"Pausa",    sub:"El comptador s'atura" },
+    represa: { et:"Represa",  sub:"Es reprèn la jornada" },
+    sortida: { et:"Sortida",  sub:"Es tanca la jornada" },
+  };
+  const DEMO = ["Marta Vilaseca", "Jordi Pous", "Aina Bertran"];
+
+  // ---------- utilitats de temps ----------
+  const p2 = n => String(n).padStart(2, "0");
+  const ymDe = d => `${d.getFullYear()}-${p2(d.getMonth() + 1)}`;
+  const diaDe = d => `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
+  const hora = iso => { const d = new Date(iso); return `${p2(d.getHours())}:${p2(d.getMinutes())}`; };
+  const fmtDur = ms => {
+    const m = Math.max(0, Math.round(ms / 60000));
+    return `${Math.floor(m / 60)}:${p2(m % 60)}`;
+  };
+  const fmtDurDec = ms => (Math.max(0, ms) / 3600000).toFixed(2).replace(".", ",");
+  const nomMes = ym => {
+    const [a, m] = ym.split("-").map(Number);
+    const t = new Date(a, m - 1, 1).toLocaleDateString("ca-ES", { month: "long", year: "numeric" });
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  };
+  const nomDia = iso => new Date(iso + "T00:00:00").toLocaleDateString("ca-ES", { weekday: "short" });
+
+  function trams(events) {
+    const out = []; let inici = null;
+    for (const e of events) {
+      if (e.tipus === "entrada" || e.tipus === "represa") { if (inici === null) inici = e.t; }
+      else if (inici !== null) { out.push([inici, e.t]); inici = null; }
+    }
+    if (inici !== null) out.push([inici, null]);
+    return out;
+  }
+  const msTreballats = (events, ara) =>
+    trams(events).reduce((a, [s, e]) => a + (new Date(e ?? ara) - new Date(s)), 0);
+
+  function estatDe(events) {
+    if (!events.length) return "fora";
+    const t = events[events.length - 1].tipus;
+    if (t === "entrada" || t === "represa") return "treballant";
+    if (t === "pausa") return "pausa";
+    return "tancada";
+  }
+
+  const idNou = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const inicialsDe = nom => nom.trim().split(/\s+/).slice(0, 2).map(x => x[0] || "").join("").toUpperCase() || "?";
+
+  // ---------- estat ----------
+  const st = {
+    equip: [],
+    registres: new Map(),   // "idTreballador__YYYY-MM" -> [events]
+    jo: null,
+    mesVista: ymDe(new Date()),
+    quiVista: null,
+    tab: "fitxar",
+    llest: false,
+  };
+  const clau = (id, ym) => `${id}__${ym}`;
+  const eventsDe = (id, ym) => st.registres.get(clau(id, ym)) ?? [];
+  const eventsDelDia = (id, iso) =>
+    eventsDe(id, iso.slice(0, 7)).filter(e => e.t.slice(0, 10) === iso);
+
+  // ---------- emmagatzematge: db compartida o local ----------
+  const LS_KEY = "fitxatge.servigest.v1";
+  let magatzem = null;
+
+  const magatzemLocal = {
+    tipus: "local",
+    _llegir() { try { return JSON.parse(localStorage.getItem(LS_KEY)) || {}; } catch { return {}; } },
+    _escriure(d) { try { localStorage.setItem(LS_KEY, JSON.stringify(d)); } catch {} },
+    async iniciar(onCanvi) {
+      const d = this._llegir();
+      st.equip = d.equip || [];
+      st.registres = new Map(Object.entries(d.registres || {}));
+      this._onCanvi = onCanvi;
+      onCanvi();
+    },
+    async desarEquip(equip) {
+      st.equip = equip;
+      const d = this._llegir(); d.equip = equip; this._escriure(d);
+      this._onCanvi();
+    },
+    async desarEvents(id, ym, events) {
+      st.registres.set(clau(id, ym), events);
+      const d = this._llegir();
+      d.registres = d.registres || {}; d.registres[clau(id, ym)] = events;
+      this._escriure(d);
+      this._onCanvi();
+    },
+    async carregarMes(ym) { /* ja és tot a memòria */ },
+    async esborrarPersona(id) {
+      const d = this._llegir();
+      for (const k of Object.keys(d.registres || {})) if (k.startsWith(id + "__")) delete d.registres[k];
+      this._escriure(d);
+      for (const k of [...st.registres.keys()]) if (k.startsWith(id + "__")) st.registres.delete(k);
+    },
+  };
+
+  function magatzemDb(db) {
+    let desSubMes = null;
+    return {
+      tipus: "db",
+      async iniciar(onCanvi) {
+        this._onCanvi = onCanvi;
+        db.doc("config/equip").onSnapshot(
+          snap => { st.equip = (snap.exists && snap.data().treballadors) || []; onCanvi(); },
+          () => onCanvi()
+        );
+        await this.carregarMes(st.mesVista);
+      },
+      async carregarMes(ym) {
+        if (desSubMes) desSubMes();
+        desSubMes = db.collection("registres").where("mes", "==", ym).onSnapshot(
+          qs => {
+            for (const d of qs.docs) st.registres.set(d.id, d.data().events || []);
+            for (const c of qs.docChanges()) if (c.type === "removed") st.registres.delete(c.doc.id);
+            this._onCanvi();
+          },
+          e => { avis(`No s'han pogut llegir els registres (${e.code}).`); }
+        );
+      },
+      async desarEquip(equip) {
+        st.equip = equip;
+        this._onCanvi();
+        await db.doc("config/equip").set({ treballadors: equip, actualitzat: new Date().toISOString() });
+      },
+      async desarEvents(id, ym, events) {
+        st.registres.set(clau(id, ym), events);
+        this._onCanvi();
+        await db.doc(`registres/${clau(id, ym)}`).set({ treballador: id, mes: ym, events });
+      },
+      async esborrarPersona(id) {
+        const qs = await db.collection("registres").where("treballador", "==", id).get();
+        await Promise.all(qs.docs.map(d => db.doc(`registres/${d.id}`).delete()));
+        for (const k of [...st.registres.keys()]) if (k.startsWith(id + "__")) st.registres.delete(k);
+      },
+    };
+  }
+
+  // ---------- avisos ----------
+  const elToast = document.getElementById("toast");
+  let toastT = null;
+  function avis(txt) {
+    elToast.textContent = txt; elToast.hidden = false;
+    clearTimeout(toastT); toastT = setTimeout(() => { elToast.hidden = true; }, 3200);
+  }
+
+  // ---------- rellotge ----------
+  const elRellotge = document.getElementById("rellotge");
+  const elDataAvui = document.getElementById("dataAvui");
+  function tic() {
+    const ara = new Date();
+    elRellotge.textContent = `${p2(ara.getHours())}:${p2(ara.getMinutes())}:${p2(ara.getSeconds())}`;
+    elDataAvui.textContent = ara.toLocaleDateString("ca-ES", { weekday: "long", day: "numeric", month: "long" });
+    if (st.llest && st.jo && st.tab === "fitxar") {
+      const ev = eventsDelDia(st.jo, diaDe(ara));
+      document.getElementById("acumulat").textContent = fmtDur(msTreballats(ev, ara.toISOString()));
+    }
+  }
+
+  // ---------- accions de fitxatge ----------
+  async function fitxar(tipus) {
+    if (!st.jo) return;
+    const ara = new Date();
+    const ym = ymDe(ara);
+    const ev = [...eventsDe(st.jo, ym), { t: ara.toISOString(), tipus }];
+    ev.sort((a, b) => a.t.localeCompare(b.t));
+    try {
+      await magatzem.desarEvents(st.jo, ym, ev);
+      avis(`${TIPUS[tipus].et} registrada a les ${p2(ara.getHours())}:${p2(ara.getMinutes())}`);
+    } catch (e) {
+      avis(`No s'ha pogut desar el fitxatge (${e.code || "error"}). Torna-ho a provar.`);
+    }
+  }
+
+  // ---------- render: fitxar ----------
+  function pintaFitxar() {
+    const hiHaEquip = st.equip.some(t => t.actiu);
+    document.getElementById("senseEquip").hidden = hiHaEquip;
+    document.getElementById("zonaFitxar").hidden = !hiHaEquip;
+    if (!hiHaEquip) return;
+
+    const sel = document.getElementById("selTreballador");
+    const actius = st.equip.filter(t => t.actiu);
+    if (!actius.some(t => t.id === st.jo)) st.jo = actius[0].id;
+    sel.innerHTML = actius.map(t => `<option value="${t.id}">${esc(t.nom)}</option>`).join("");
+    sel.value = st.jo;
+
+    const jo = st.equip.find(t => t.id === st.jo);
+    document.getElementById("inicials").textContent = inicialsDe(jo.nom);
+
+    const avui = diaDe(new Date());
+    const ev = eventsDelDia(st.jo, avui);
+    const estat = estatDe(ev);
+
+    const pastilles = {
+      treballant: ["p-treballant", "Treballant"],
+      pausa: ["p-pausa", "En pausa"],
+      fora: ["p-fora", "Fora de jornada"],
+      tancada: ["p-tancada", "Jornada tancada"],
+    };
+    const [cls, txt] = pastilles[estat];
+    const past = document.getElementById("pastilla");
+    past.className = "pastilla " + cls;
+    document.getElementById("pastillaTxt").textContent = txt;
+    document.getElementById("acumulat").textContent = fmtDur(msTreballats(ev, new Date().toISOString()));
+
+    const btnGran = (tipus, cls2, sub) =>
+      `<button class="btn-gran ${cls2}" data-fitxa="${tipus}">
+         <span class="txt"><b>${TIPUS[tipus].et}</b><span>${sub}</span></span>
+         <span class="fletxa" aria-hidden="true">→</span>
+       </button>`;
+    const btnSec = (tipus, extra, txt2) =>
+      `<button class="btn-sec ${extra}" data-fitxa="${tipus}"><b>${TIPUS[tipus].et}</b> · ${txt2}</button>`;
+
+    let html = "";
+    if (estat === "treballant") {
+      html = btnGran("sortida", "b-indigo", "Tanca la jornada d'avui") + btnSec("pausa", "ochre", "atura el comptador");
+    } else if (estat === "pausa") {
+      html = btnGran("represa", "b-pine", "Torna a comptar temps") + btnSec("sortida", "", "tanca la jornada");
+    } else {
+      const sub = estat === "tancada" ? "Obre una nova jornada" : "Comença a comptar temps";
+      html = btnGran("entrada", "b-pine", sub);
+    }
+    document.getElementById("accions").innerHTML = html;
+
+    const crono = document.getElementById("crono");
+    crono.innerHTML = ev.map(e => `
+      <li class="c-${e.tipus}">
+        <span class="h mono">${hora(e.t)}</span>
+        <span class="rail"><span class="punt"></span></span>
+        <span class="et">${TIPUS[e.tipus].et}<small>${TIPUS[e.tipus].sub}</small></span>
+      </li>`).join("");
+    document.getElementById("cronoBuit").hidden = ev.length > 0;
+  }
+
+  // ---------- render: registre ----------
+  function pintaRegistre() {
+    const qui = st.equip.find(t => t.id === (st.quiVista || st.jo)) || st.equip[0];
+    document.getElementById("mesTitol").textContent = qui ? `${nomMes(st.mesVista)} · ${qui.nom.split(" ")[0]}` : nomMes(st.mesVista);
+    const cos = document.getElementById("taulaCos");
+    const peu = document.getElementById("taulaPeu");
+    if (!qui) { cos.innerHTML = ""; peu.innerHTML = ""; document.getElementById("taulaBuida").hidden = false; return; }
+
+    const ev = eventsDe(qui.id, st.mesVista);
+    const perDia = new Map();
+    for (const e of ev) {
+      const d = e.t.slice(0, 10);
+      if (!perDia.has(d)) perDia.set(d, []);
+      perDia.get(d).push(e);
+    }
+    const dies = [...perDia.keys()].sort();
+    document.getElementById("taulaBuida").hidden = dies.length > 0;
+
+    const ara = new Date().toISOString();
+    let totalMes = 0;
+    cos.innerHTML = dies.map(d => {
+      const e = perDia.get(d);
+      const tr = trams(e);
+      const ms = msTreballats(e, ara);
+      totalMes += ms;
+      const pauses = Math.max(0, tr.length - 1);
+      const obert = tr.length && tr[tr.length - 1][1] === null;
+      return `<tr>
+        <td class="dia">${Number(d.slice(8))}<small>${nomDia(d)}</small></td>
+        <td class="mono">${hora(e[0].t)}</td>
+        <td class="mono">${obert ? '<span class="obert">obert</span>' : hora(e[e.length - 1].t)}</td>
+        <td class="mono">${pauses || "—"}</td>
+        <td class="mono">${fmtDur(ms)}</td>
+      </tr>`;
+    }).join("");
+    peu.innerHTML = dies.length
+      ? `<tr><td colspan="3">${dies.length} ${dies.length === 1 ? "dia" : "dies"}</td><td></td><td class="mono">${fmtDur(totalMes)}</td></tr>`
+      : "";
+  }
+
+  // ---------- render: equip ----------
+  function pintaEquip() {
+    const ul = document.getElementById("llistaEquip");
+    ul.innerHTML = st.equip.map(t => `
+      <li class="${t.actiu ? "" : "inactiu"}" data-id="${t.id}">
+        <span class="avatar" style="width:32px;height:32px;flex-basis:32px;font-size:13px">${inicialsDe(t.nom)}</span>
+        <span class="nom">${esc(t.nom)}<small>${t.actiu ? "Pot fitxar" : "De baixa"}</small></span>
+        <button class="mini" data-accio="alternar">${t.actiu ? "Baixa" : "Alta"}</button>
+        <button class="mini perill" data-accio="esborrar" aria-label="Esborrar ${esc(t.nom)}">✕</button>
+      </li>`).join("");
+    document.getElementById("equipBuit").hidden = st.equip.length > 0;
+  }
+
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  function pinta() {
+    st.llest = true;
+    pintaFitxar();
+    if (st.tab === "registre") pintaRegistre();
+    if (st.tab === "equip") pintaEquip();
+    if (st.jo) { try { localStorage.setItem("fitxatge.jo", st.jo); } catch {} }
+  }
+
+  // ---------- pestanyes ----------
+  document.querySelectorAll('.tabs button').forEach(b => {
+    b.addEventListener("click", () => mostraTab(b.dataset.tab));
+  });
+  function mostraTab(nom) {
+    st.tab = nom;
+    document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === nom)));
+    for (const t of ["fitxar", "registre", "equip"]) document.getElementById("panel-" + t).hidden = t !== nom;
+    pinta();
+  }
+
+  // ---------- esdeveniments ----------
+  document.getElementById("accions").addEventListener("click", e => {
+    const b = e.target.closest("[data-fitxa]");
+    if (b) fitxar(b.dataset.fitxa);
+  });
+  document.getElementById("selTreballador").addEventListener("change", e => {
+    st.jo = e.target.value; st.quiVista = null; pinta();
+  });
+  document.getElementById("anarEquip").addEventListener("click", () => mostraTab("equip"));
+  document.getElementById("carregarDemo").addEventListener("click", async () => {
+    const equip = DEMO.map(nom => ({ id: idNou(), nom, actiu: true }));
+    await magatzem.desarEquip([...st.equip, ...equip]);
+    const avui = new Date();
+    const base = new Date(avui.getFullYear(), avui.getMonth(), avui.getDate(), 8, 30);
+    await magatzem.desarEvents(equip[0].id, ymDe(avui), [
+      { t: base.toISOString(), tipus: "entrada" },
+      { t: new Date(base.getTime() + 3.5 * 36e5).toISOString(), tipus: "pausa" },
+      { t: new Date(base.getTime() + 4 * 36e5).toISOString(), tipus: "represa" },
+    ]);
+    avis("Equip d'exemple carregat. Esborra'l a la pestanya Equip.");
+  });
+
+  document.getElementById("formAfegir").addEventListener("submit", async e => {
+    e.preventDefault();
+    const camp = document.getElementById("nouNom");
+    const nom = camp.value.trim();
+    if (!nom) return;
+    camp.value = "";
+    await magatzem.desarEquip([...st.equip, { id: idNou(), nom, actiu: true }]);
+    avis(`${nom} ja pot fitxar.`);
+  });
+
+  document.getElementById("llistaEquip").addEventListener("click", async e => {
+    const b = e.target.closest("[data-accio]");
+    if (!b) return;
+    const id = b.closest("li").dataset.id;
+    const p = st.equip.find(t => t.id === id);
+    if (b.dataset.accio === "alternar") {
+      await magatzem.desarEquip(st.equip.map(t => t.id === id ? { ...t, actiu: !t.actiu } : t));
+    } else {
+      if (!confirm(`Esborrar ${p.nom} i tot el seu històric de fitxatges? No es pot desfer.`)) return;
+      await magatzem.esborrarPersona(id);
+      await magatzem.desarEquip(st.equip.filter(t => t.id !== id));
+      if (st.jo === id) st.jo = null;
+      avis(`${p.nom} i els seus registres s'han esborrat.`);
+    }
+  });
+
+  document.getElementById("mesAnt").addEventListener("click", () => mouMes(-1));
+  document.getElementById("mesSeg").addEventListener("click", () => mouMes(1));
+  async function mouMes(delta) {
+    const [a, m] = st.mesVista.split("-").map(Number);
+    st.mesVista = ymDe(new Date(a, m - 1 + delta, 1));
+    await magatzem.carregarMes(st.mesVista);
+    pintaRegistre();
+  }
+
+  document.getElementById("canviaPersona").addEventListener("click", () => {
+    if (st.equip.length < 2) { avis("Només hi ha una persona donada d'alta."); return; }
+    const actual = st.equip.findIndex(t => t.id === (st.quiVista || st.jo));
+    st.quiVista = st.equip[(actual + 1) % st.equip.length].id;
+    pintaRegistre();
+  });
+
+  // ---------- exportació CSV ----------
+  document.getElementById("exportaCsv").addEventListener("click", async () => {
+    const qui = st.equip.find(t => t.id === (st.quiVista || st.jo));
+    if (!qui) return;
+    const ev = eventsDe(qui.id, st.mesVista);
+    if (!ev.length) { avis("Aquest mes no té cap fitxatge per exportar."); return; }
+    const files = [["Data", "Hora", "Treballador", "Moviment"]];
+    for (const e of ev) files.push([e.t.slice(0, 10), hora(e.t), qui.nom, TIPUS[e.tipus].et]);
+    const perDia = new Map();
+    for (const e of ev) { const d = e.t.slice(0, 10); (perDia.get(d) || perDia.set(d, []).get(d)).push(e); }
+    files.push([]);
+    files.push(["Resum diari", "", "", ""]);
+    files.push(["Data", "Hores (h:mm)", "Hores (decimal)", ""]);
+    const ara = new Date().toISOString();
+    let total = 0;
+    for (const d of [...perDia.keys()].sort()) {
+      const ms = msTreballats(perDia.get(d), ara); total += ms;
+      files.push([d, fmtDur(ms), fmtDurDec(ms), ""]);
+    }
+    files.push(["TOTAL", fmtDur(total), fmtDurDec(total), ""]);
+
+    const csv = "﻿" + files.map(f => f.map(c => `"${String(c).replace(/"/g, '""')}"`).join(";")).join("\r\n");
+    const nomFitxer = `fitxatge_${qui.nom.replace(/\s+/g, "-").toLowerCase()}_${st.mesVista}.csv`;
+    const baixades = await claudeUse("downloads");
+    if (baixades) {
+      try { await baixades.save({ filename: nomFitxer, data: csv }); return; }
+      catch (err) { if (err && err.code === "cancelled") return; }
+    }
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = nomFitxer; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  });
+
+  // ---------- arrencada ----------
+  const claudeUse = async nom => {
+    try { return window.claude && window.claude.use ? await window.claude.use(nom) : null; }
+    catch { return null; }
+  };
+
+  function marcaMagatzem() {
+    const el = document.getElementById("estatDades");
+    const nota = document.getElementById("notaDades");
+    if (magatzem.tipus === "db") {
+      el.className = "estat-dades ok";
+      el.querySelector("span").textContent = "Dades compartides · totes les persones veuen el mateix";
+      nota.innerHTML = "Els fitxatges es desen al servidor d'aquesta pàgina. Qui obri l'enllaç des del mòbil o des d'un altre ordinador veu i escriu el <b>mateix registre</b>, en temps real.";
+      document.getElementById("orgNom").textContent = "Registre horari compartit";
+    } else {
+      el.className = "estat-dades";
+      el.querySelector("span").textContent = "Dades en aquest dispositiu";
+      nota.innerHTML = "Aquesta còpia desa els fitxatges <b>només en aquest navegador</b>. Cada mòbil o ordinador porta el seu propi registre; exporta el CSV per ajuntar-los.";
+      document.getElementById("orgNom").textContent = "Registre horari local";
+    }
+  }
+
+  (async () => {
+    try { st.jo = localStorage.getItem("fitxatge.jo"); } catch {}
+    tic();
+    setInterval(tic, 1000);
+
+    const db = await claudeUse("db");
+    magatzem = db ? magatzemDb(db) : magatzemLocal;
+    marcaMagatzem();
+    if (db) {
+      // el magatzem local ja pot tenir dades d'una sessió anterior fora de línia
+      try { const d = magatzemLocal._llegir(); if (!st.equip.length && d.equip) st.equip = d.equip; } catch {}
+    }
+    await magatzem.iniciar(pinta);
+    pinta();
+  })();
+})();
+</script>
