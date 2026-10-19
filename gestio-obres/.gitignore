@@ -1,0 +1,6 @@
+# Dades de clients, documents i base de dades: MAI al repositori (RGPD)
+data/
+*.sqlite3*
+.env
+__pycache__/
+.pytest_cache/

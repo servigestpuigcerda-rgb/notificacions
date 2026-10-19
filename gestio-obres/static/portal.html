@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ca">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>Seguiment de la feina</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+  <style>
+    main { max-width: 760px; margin: 0 auto; padding: 16px 16px 40px; }
+    .capcalera { padding: 8px 0 14px; }
+    .capcalera .empresa { color: var(--blau); font-weight: 700; }
+    .p-acc { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .enviar-msg { position: static; }
+    .fila-enviar span { margin-right: auto; }
+    #toasts { bottom: 24px; }
+  </style>
+</head>
+<body>
+  <main id="p"><div class="carregant">Carregant…</div></main>
+  <div id="toasts"></div>
+  <script type="module">
+    import { esc, eur, dataCat, dataHora, modal, toast, errorToast, badge, ESTATS_PRESSUPOST, ESTATS_FACTURA } from "/static/js/core.js";
+    import { modalSignatura } from "/static/js/forms.js";
+    const token = location.pathname.split("/")[2];
+    const base = `/api/portal/${token}`;
+    const req = async (m, u, b) => {
+      const r = await fetch(u, { method: m, headers: { "Content-Type": "application/json" }, body: b ? JSON.stringify(b) : undefined });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.detail || "Error");
+      return d;
+    };
+    const ESTAT_FEINA = { pressupost: "Pendent de pressupost", acceptada: "Acceptada", en_curs: "En curs", acabada: "Acabada", tancada: "Tancada", cancellada: "Cancel·lada" };
+
+    async function pinta() {
+      const d = await req("GET", base);
+      const el = document.getElementById("p");
+      document.title = `${d.feina.nom} · ${d.empresa.nom || ""}`;
+      const pendents = d.pressupostos.filter((p) => p.estat === "enviat");
+      el.innerHTML = `
+        <div class="capcalera"><div class="empresa">${esc(d.empresa.nom || "")}</div>
+          <h1>${esc(d.feina.nom)}</h1><div class="muted">${esc(d.feina.adreca || "")} · Ref. ${esc(d.feina.codi)} · ${esc(ESTAT_FEINA[d.feina.estat] || d.feina.estat)}</div></div>
+
+        ${pendents.map((p) => `<div class="targeta" style="border-color:var(--blau)">
+          <h2 style="margin-top:0">${p.tipus === "extra" ? "⚠️ Treball fora de pressupost" : "📄 Pressupost"} pendent de la vostra resposta</h2>
+          <p><b>${esc(p.numero)}</b> ${esc(p.titol || "")}<br>Import: <b>${eur(p.total)}</b> (IVA inclòs)</p>
+          ${p.tipus === "extra" ? `<p class="muted">Aquest treball no estava inclòs al pressupost inicial. No el farem sense la vostra conformitat.</p>` : ""}
+          <div class="p-acc"><a class="btn" target="_blank" href="/p/${token}/imprimir/pressupost/${p.id}">Veure el detall</a>
+            <button class="btn primari gran" data-accepta="${p.id}">Accepto</button>
+            <button class="btn" data-rebutja="${p.id}">No l'accepto</button></div></div>`).join("")}
+
+        <section class="kpis petits">
+          <div class="kpi"><small>Import acceptat (sense IVA)</small><b>${eur(d.resum.contractat)}</b></div>
+          <div class="kpi"><small>Facturat</small><b>${eur(d.resum.facturat)}</b></div>
+          <div class="kpi"><small>Pagat</small><b>${eur(d.resum.cobrat)}</b></div>
+          <div class="kpi"><small>Pendent de pagament</small><b>${eur(d.resum.pendent_cobrar)}</b></div>
+        </section>
+
+        <h2>Pressupostos</h2>
+        ${d.pressupostos.length ? `<div class="llista">${d.pressupostos.map((p) => `
+          <a class="fila" target="_blank" href="/p/${token}/imprimir/pressupost/${p.id}"><div><b>${esc(p.numero)}</b> ${badge(p.estat, ESTATS_PRESSUPOST)}
+            <div class="muted">${esc(p.titol || "")} ${p.acceptat_per ? "· acceptat per " + esc(p.acceptat_per) : ""}</div></div><div class="r"><b>${eur(p.total)}</b></div></a>`).join("")}</div>` : `<p class="muted">Encara no n'hi ha cap.</p>`}
+
+        ${d.albarans.length ? `<h2>Albarans de feina</h2><div class="llista">${d.albarans.map((a) => `
+          <div class="fila"><div><b>${esc(a.numero)}</b> · ${dataCat(a.data)}<div class="muted">${esc(a.descripcio || "")}</div></div>
+            <div class="botons-fila"><a class="btn petit" target="_blank" href="/p/${token}/imprimir/albara/${a.id}">Veure</a>
+            ${a.estat === "signat" ? `<span class="badge b-acceptat">Signat</span>` : `<button class="btn petit primari" data-signa="${a.id}">Signar</button>`}</div></div>`).join("")}</div>` : ""}
+
+        ${d.factures.length ? `<h2>Factures</h2><div class="llista">${d.factures.map((f) => `
+          <a class="fila" target="_blank" href="/p/${token}/imprimir/factura/${f.id}"><div><b>${esc(f.codi)}</b> ${badge(f.estat, ESTATS_FACTURA)}
+            <div class="muted">${dataCat(f.data)} · venciment ${dataCat(f.venciment)}</div></div><div class="r"><b>${eur(f.total)}</b></div></a>`).join("")}</div>` : ""}
+
+        <h2>Missatges</h2>
+        <div class="xat">${d.missatges.map((m) => `<div class="msg ${m.autor === "client" ? "empresa" : m.autor === "empresa" ? "client" : "sistema"} t-${m.tipus}">
+          <div class="bombolla">${esc(m.text)}</div><small>${m.autor === "client" ? "Vosaltres" : esc(d.empresa.nom || "Empresa")} · ${dataHora(m.created_at)}</small></div>`).join("") || `<p class="muted">Cap missatge.</p>`}</div>
+        <form class="enviar-msg"><textarea name="text" rows="2" placeholder="Escriviu-nos aquí qualsevol dubte o comentari"></textarea>
+          <div class="fila-enviar"><span class="muted">${esc(d.empresa.telefon || "")} ${esc(d.empresa.email || "")}</span><button class="btn primari">Envia</button></div></form>
+        <p class="muted" style="margin-top:24px">Aquest enllaç és personal: no el compartiu. Les vostres dades es tracten només per gestionar aquesta feina.</p>`;
+      const xat = el.querySelector(".xat"); xat.scrollTop = xat.scrollHeight;
+
+      el.querySelectorAll("[data-accepta]").forEach((b) => (b.onclick = () => {
+        const p = d.pressupostos.find((x) => x.id === +b.dataset.accepta);
+        const m = modal("Acceptar el pressupost", `<div class="form"><p>${esc(p.numero)} · <b>${eur(p.total)}</b> IVA inclòs</p>
+          <label>Nom i cognoms<input name="nom" autocomplete="name"></label>
+          <label class="check"><input type="checkbox" name="accepto"> He llegit el pressupost i l'accepto amb les seves condicions.</label></div>`, {
+          botons: [{ text: "Cancel·la" }, { text: "Accepto", classe: "primari", accio: (e) => req("POST", `${base}/pressupostos/${p.id}/acceptar`,
+            { nom: e.querySelector("[name=nom]").value, accepto: e.querySelector("[name=accepto]").checked }) }],
+        });
+        m.done.then((r) => { if (r) { toast("Gràcies! Pressupost acceptat."); pinta(); } });
+      }));
+      el.querySelectorAll("[data-rebutja]").forEach((b) => (b.onclick = () => {
+        const m = modal("No accepto el pressupost", `<div class="form"><label>Ens podeu dir el motiu? (opcional)<textarea name="motiu" rows="3"></textarea></label></div>`, {
+          botons: [{ text: "Cancel·la" }, { text: "Envia", classe: "primari", accio: (e) => req("POST", `${base}/pressupostos/${b.dataset.rebutja}/rebutjar`, { motiu: e.querySelector("[name=motiu]").value }) }],
+        });
+        m.done.then((r) => { if (r) pinta(); });
+      }));
+      el.querySelectorAll("[data-signa]").forEach((b) => (b.onclick = async () => {
+        const s = await modalSignatura("Signar l'albarà");
+        if (!s) return;
+        try { await req("POST", `${base}/albarans/${b.dataset.signa}/signar`, s); toast("Albarà signat"); pinta(); } catch (e) { errorToast(e); }
+      }));
+      el.querySelector("form").onsubmit = async (e) => {
+        e.preventDefault();
+        const t = e.target.text.value.trim(); if (!t) return;
+        try { await req("POST", `${base}/missatges`, { text: t }); pinta(); } catch (err) { errorToast(err); }
+      };
+    }
+    pinta().catch((e) => (document.getElementById("p").innerHTML = `<div class="buit">${esc(e.message)}</div>`));
+  </script>
+</body>
+</html>
