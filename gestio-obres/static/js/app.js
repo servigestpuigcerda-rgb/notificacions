@@ -1,6 +1,7 @@
 import { api, esc, errorToast, formData, get, post, state, toast } from "./core.js";
 import { vistaInici } from "./v-inici.js";
 import { obreAssistent } from "./assistent.js";
+import { vistaPortal } from "./portal.js";
 import { vistaFeines, vistaFeina } from "./v-feines.js";
 import { vistaPressupost } from "./v-pressupost.js";
 import { vistaCaptura, vistaHores, vistaDictar } from "./v-captura.js";
@@ -25,6 +26,7 @@ const RUTES = [
   [/^\/aprenentatge$/, vistaAprenentatge],
   [/^\/config$/, vistaConfig],
   [/^\/mes$/, vistaMes],
+  [/^\/portal\/([\w-]+)$/, (el, [t]) => vistaPortalIntern(el, t)],
 ];
 
 const MENU = [
@@ -85,6 +87,13 @@ export function accioRapida() {
     if (e.target === fons || e.target.closest("a,[data-tanca]")) fons.remove();
   };
   document.body.appendChild(fons);
+}
+
+// Vista prèvia del portal tal com el veu el client
+async function vistaPortalIntern(el, token) {
+  el.innerHTML = `<div class="avis info">👁️ Així ho veu el client amb el seu enllaç. <a href="#" data-torna>‹ Torna</a></div><div data-portal class="portal-intern"></div>`;
+  el.querySelector("[data-torna]").onclick = (e) => { e.preventDefault(); history.back(); };
+  await vistaPortal(el.querySelector("[data-portal]"), token);
 }
 
 export function feinaActual() {
@@ -163,6 +172,6 @@ async function inicia() {
   navega();
 }
 
-if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+if ("serviceWorker" in navigator && !window.DEMO) navigator.serviceWorker.register("/sw.js").catch(() => {});
 window.addEventListener("unhandledrejection", (e) => { if (e.reason && e.reason.message) toast(e.reason.message, "error"); });
 inicia();

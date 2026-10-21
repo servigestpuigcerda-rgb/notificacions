@@ -179,7 +179,12 @@ export async function comprimeixImatge(file, maxDim = 2000, qualitat = 0.85) {
 }
 
 export function enllacPortal(token) {
-  return `${location.origin}/p/${token}`;
+  return window.DEMO ? window.DEMO.enllacPortal(token) : `${location.origin}/p/${token}`;
+}
+
+// Adreça real d'un fitxer (a la demo, les fotos viuen al navegador)
+export function urlFitxer(u) {
+  return window.DEMO ? window.DEMO.url(u) : u;
 }
 
 // Diàleg per compartir amb el client (WhatsApp, correu, copiar)
@@ -196,7 +201,9 @@ export function compartir({ token, text, telefon, email, assumpte = "" }) {
       <a class="btn gran whatsapp" href="${esc(wa)}" target="_blank" rel="noopener">WhatsApp</a>
       <a class="btn gran" href="${esc(mail)}">Correu</a>
       ${navigator.share ? `<button class="btn gran" data-share>Comparteix…</button>` : ""}
+      <a class="btn gran" href="#/portal/${esc(token)}" data-veure>Veure com ho veu el client</a>
     </div>`);
+  m.el.querySelector("[data-veure]").addEventListener("click", () => m.close());
   m.el.querySelector("[data-copia]").onclick = async () => {
     try { await navigator.clipboard.writeText(url); toast("Enllaç copiat"); } catch { m.el.querySelector("input").select(); }
   };

@@ -1,4 +1,6 @@
 // Visor 3D de la maqueta (three.js). La vista és de "casa de nines": les parets més properes a la càmera no es dibuixen.
+import { urlFitxer } from "./core.js";
+
 let THREE, OrbitControls;
 
 async function carrega() {
@@ -20,7 +22,7 @@ function textura(mat, fotoUrl) {
   const ph = (mat.mida_peca_alt_cm || (mat.patro === "llistons" ? 120 : mat.mida_peca_cm || 30)) / 100;
   let tex;
   if (mat.foto_document_id && fotoUrl) {
-    tex = new THREE.TextureLoader().load(fotoUrl(mat.foto_document_id));
+    tex = new THREE.TextureLoader().load(urlFitxer(fotoUrl(mat.foto_document_id)));
   } else {
     const cv = document.createElement("canvas");
     const S = 256;

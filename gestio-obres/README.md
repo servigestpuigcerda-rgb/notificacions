@@ -119,3 +119,7 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 - `app/` — servidor (FastAPI + SQLite): `main.py` (API), `calc.py` (totals, pendent de facturar, impostos), `learning.py` (historial i revisions), `ai.py` (Claude API), `printing.py` (documents imprimibles).
 - `static/` — interfície web sense dependències externes (mòduls JS), portal del client i service worker.
 - `tests/` — prova del flux complet amb dades inventades.
+
+## Demo
+
+La carpeta `demo/` conté una versió de demostració que funciona sola al navegador, sense servidor: `demo-api.js` simula l'API amb dades inventades i la IA amb regles senzilles. Serveix per veure el funcionament; no és la versió definitiva. Per provar-la en local, serveix `demo/index.html` juntament amb `static/styles.css`, `static/js/` i `static/vendor/` amb les mateixes rutes relatives (`styles.css`, `js/`, `vendor/`).
