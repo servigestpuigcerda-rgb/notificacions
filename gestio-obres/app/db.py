@@ -258,6 +258,46 @@ CREATE TABLE IF NOT EXISTS aprenentatge_proveidors (
     updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS planning (
+    id INTEGER PRIMARY KEY,
+    feina_id INTEGER NOT NULL REFERENCES feines(id) ON DELETE CASCADE,
+    ordre INTEGER NOT NULL DEFAULT 0,
+    titol TEXT NOT NULL,
+    data_inici TEXT,
+    data_fi TEXT,
+    estat TEXT NOT NULL DEFAULT 'pendent',       -- pendent | en_curs | fet
+    pct INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS valoracions (
+    id INTEGER PRIMARY KEY,
+    feina_id INTEGER NOT NULL REFERENCES feines(id) ON DELETE CASCADE,
+    puntuacio INTEGER NOT NULL,                  -- 1 a 5
+    comentari TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS renders (
+    id INTEGER PRIMARY KEY,
+    feina_id INTEGER NOT NULL REFERENCES feines(id) ON DELETE CASCADE,
+    titol TEXT NOT NULL,
+    descripcio TEXT,
+    model_json TEXT NOT NULL,
+    fotos_json TEXT,
+    visible_client INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS analisis (
+    id INTEGER PRIMARY KEY,
+    feina_id INTEGER NOT NULL REFERENCES feines(id) ON DELETE CASCADE,
+    dades_json TEXT NOT NULL,
+    text_json TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_despeses_feina ON despeses(feina_id);
 CREATE INDEX IF NOT EXISTS idx_hores_feina ON hores(feina_id);
 CREATE INDEX IF NOT EXISTS idx_pressupostos_feina ON pressupostos(feina_id);
@@ -292,6 +332,11 @@ SETTINGS_INICIALS = {
     "validesa_pressupost": "30",
     "venciment_dies": "30",
     "condicions_pressupost": "Pressupost vàlid durant el termini indicat. Qualsevol treball no inclòs es comunicarà i pressupostarà a part abans d'executar-lo.",
+    "empresa_bizum": "",
+    "gestor_nom": "",
+    "gestor_email": "",
+    "regim_fiscal": "autonom",                   # autonom (IRPF model 130) | societat
+    "irpf_fraccionat_pct": "20",
     "ia_activa": "1",
     "ia_model": "claude-opus-5-5",
 }
@@ -335,11 +380,25 @@ def tx():
         raise
 
 
+# Columnes afegides en versions posteriors (s'afegeixen a les bases de dades existents)
+COLUMNES_NOVES = [
+    ("linies_pressupost", "referencia", "TEXT"),
+    ("linies_pressupost", "foto_document_id", "INTEGER REFERENCES documents(id) ON DELETE SET NULL"),
+    ("documents", "visible_client", "INTEGER NOT NULL DEFAULT 0"),
+    ("factures", "bloqueja", "INTEGER NOT NULL DEFAULT 1"),
+    ("factures", "pagament_notificat_at", "TEXT"),
+    ("missatges", "document_id", "INTEGER REFERENCES documents(id) ON DELETE SET NULL"),
+]
+
+
 def init_db():
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     DOCS_DIR.mkdir(parents=True, exist_ok=True)
     conn = connect()
     conn.executescript(SCHEMA)
+    for taula, col, decl in COLUMNES_NOVES:
+        if col not in {r[1] for r in conn.execute(f"PRAGMA table_info({taula})")}:
+            conn.execute(f"ALTER TABLE {taula} ADD COLUMN {col} {decl}")
     if conn.execute("SELECT COUNT(*) FROM partides").fetchone()[0] == 0:
         for i, (nom, tipus) in enumerate(PARTIDES_INICIALS):
             conn.execute("INSERT INTO partides(nom, tipus, ordre) VALUES (?,?,?)", (nom, tipus, i))

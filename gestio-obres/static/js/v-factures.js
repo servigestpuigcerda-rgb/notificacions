@@ -105,6 +105,9 @@ export async function vistaFactura(el, [id], _q, viva) {
         <div class="muted">${esc(f.client_nom || "Sense client")} ${f.client_nif ? "· " + esc(f.client_nif) : ""}</div></div>
       <div class="accions-cap"><button class="btn" data-imprimir>Imprimir / PDF</button></div>
     </header>
+    ${f.pagament_notificat_at && f.estat === "emesa" ? `<div class="avis info">💶 El client ha indicat que ha pagat (${dataCat(f.pagament_notificat_at)}). Comprova l'ingrés i marca-la com a cobrada.</div>` : ""}
+    ${f.feina_id && !f.rectifica_id && f.estat !== "cobrada" && f.estat !== "anullada" ? `<label class="check targeta"><input type="checkbox" data-bloqueja ${f.bloqueja ? "checked" : ""}>
+      Mentre no es pagui, la feina queda aturada (el client ho veu al seu enllaç)</label>` : ""}
     <div class="targeta form">
       <div class="tres"><label>Data<input type="date" data-c="data" value="${esc(f.data)}" ${esb ? "" : "disabled"}></label>
         <label>Venciment<input type="date" data-c="venciment" value="${esc(f.venciment || "")}" ${esb ? "" : "disabled"}></label>
@@ -172,10 +175,12 @@ export async function vistaFactura(el, [id], _q, viva) {
     if (!(await confirma("Emetre la factura? Rebrà número i ja no es podrà modificar.", { ok: "Emet" }))) return;
     await post(`/api/factures/${id}/emetre`); toast("Factura emesa"); recarrega();
   });
+  const bq = el.querySelector("[data-bloqueja]");
+  if (bq) bq.onchange = () => post(`/api/factures/${id}/bloqueja`, { bloqueja: bq.checked }).then(() => toast("Desat")).catch(errorToast);
   on("[data-cobra]", async () => { await post(`/api/factures/${id}/cobrar`, { cobrada: true }); toast("Cobrada ✓"); recarrega(); });
   on("[data-descobra]", async () => { await post(`/api/factures/${id}/cobrar`, { cobrada: false }); recarrega(); });
   on("[data-envia]", () => compartir({ token: f.token, telefon: f.client_telefon, email: f.client_email, assumpte: `Factura ${f.codi}`,
-    text: `Us enviem la factura ${f.codi} per import de ${eur(f.total)}, amb venciment ${dataCat(f.venciment)}.` }));
+    text: `Us enviem la factura ${f.codi} per import de ${eur(f.total)}, amb venciment ${dataCat(f.venciment)}. La podeu pagar per transferència o Bizum des de l'enllaç.` }));
   on("[data-rectifica]", async () => {
     const m = modal("Anul·lar factura", `<div class="form"><p>Es crearà una factura rectificativa per l'import negatiu i l'import tornarà a quedar pendent de facturar.</p>
       <label>Motiu<input name="motiu" required></label></div>`, {

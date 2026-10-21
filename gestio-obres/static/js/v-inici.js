@@ -1,4 +1,5 @@
 import { badge, barra, buit, dataCat, esc, eur, ESTATS_FEINA, get, num, state } from "./core.js";
+import { obreAssistent } from "./assistent.js";
 
 export function targetaFeina(f) {
   const r = f.resum;
@@ -30,6 +31,8 @@ export async function vistaInici(el, _p, _q, viva) {
     <header class="cap"><h1>Hola, ${esc(state.usuari.nom.split(" ")[0])}</h1>
       <div class="muted">${dataCat(new Date().toISOString())} · avui portes ${num(d.hores_avui)} h apuntades</div></header>
 
+    <button class="barra-assistent" data-assistent><span>🎙️</span>Digues què vols fer… <small>«afegeix 4 hores a la feina del carrer Major»</small></button>
+
     <div class="rapides">
       <a href="#/captura" class="rapida"><span>📷</span>Foto tiquet</a>
       <a href="#/hores" class="rapida"><span>⏱️</span>Hores</a>
@@ -47,6 +50,9 @@ export async function vistaInici(el, _p, _q, viva) {
       <div class="kpi"><small>Pressupostos per acceptar</small><b>${eur(t.pendent_acceptar)}</b></div>
     </section>
 
+    ${d.pagaments_notificats.length ? `<section class="avisos-inici">${d.pagaments_notificats.map((p) => `<a class="avis-fila verd-f" href="#/factura/${p.id}">💶 El client diu que ha pagat la factura ${esc(p.codi)} (${eur(p.total)}) · ${esc(p.feina_nom || "")}. Comprova l'ingrés i marca-la cobrada.</a>`).join("")}</section>` : ""}
+    ${d.bloquejades.length ? `<section><h2>Feines aturades pel client</h2><div class="avisos-inici">${d.bloquejades.map((b) => `<a class="avis-fila vermell-f" href="#/feina/${b.feina_id}">⛔ <b>${esc(b.feina)}</b> — ${b.bloquejos.map((x) => esc(x.text.split(".")[0])).join(" · ")}</a>`).join("")}</div></section>` : ""}
+
     ${d.no_llegits.length || d.despeses_pendents || d.pressupostos_enviats.length ? `
     <section class="avisos-inici">
       ${d.no_llegits.map((m) => `<a class="avis-fila blau" href="#/feina/${m.feina_id}/missatges">💬 ${m.n} missatge(s) nou(s) del client · ${esc(m.codi)} ${esc(m.nom)}</a>`).join("")}
@@ -62,4 +68,5 @@ export async function vistaInici(el, _p, _q, viva) {
       ${d.feines.length ? `<div class="graella">${d.feines.map(targetaFeina).join("")}</div>`
         : buit("Encara no hi ha cap feina.", `<a class="btn primari" href="#/feines?nova=1">Crea la primera feina</a>`)}
     </section>`;
+  el.querySelector("[data-assistent]").onclick = () => obreAssistent();
 }

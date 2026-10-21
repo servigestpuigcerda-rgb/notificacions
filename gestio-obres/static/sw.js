@@ -1,9 +1,11 @@
 // Service worker: guarda la interfície per obrir-la ràpid i amb mala cobertura.
 // Les dades (API) sempre van a la xarxa.
-const CACHE = "obres-v1";
+const CACHE = "obres-v2";
 const SHELL = ["/", "/static/styles.css", "/static/js/app.js", "/static/js/core.js", "/static/js/forms.js",
   "/static/js/v-inici.js", "/static/js/v-feines.js", "/static/js/v-pressupost.js", "/static/js/v-captura.js",
-  "/static/js/v-factures.js", "/static/js/v-altres.js", "/static/icon.svg", "/static/manifest.webmanifest"];
+  "/static/js/v-factures.js", "/static/js/v-altres.js", "/static/js/assistent.js", "/static/js/render3d.js",
+  "/static/js/v-render.js", "/static/js/v-feina-extra.js",
+  "/static/vendor/three/three.module.min.js", "/static/vendor/three/OrbitControls.js", "/static/icon.svg", "/static/manifest.webmanifest"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

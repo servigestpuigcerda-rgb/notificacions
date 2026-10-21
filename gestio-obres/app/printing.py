@@ -43,6 +43,7 @@ td{padding:8px;border-bottom:1px solid #e3e7ee;vertical-align:top}.r{text-align:
 .firma img{max-height:90px;display:block}
 .bar{max-width:860px;margin:16px auto 0;display:flex;gap:8px;justify-content:flex-end}
 .bar button{background:#1f5fae;color:#fff;border:0;border-radius:8px;padding:10px 16px;font-size:15px;cursor:pointer}
+.foto-mat{display:block;max-width:140px;max-height:110px;border-radius:6px;margin-top:6px;object-fit:cover}
 .estat{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;background:#e8f5ec;color:#1b7a3d;font-weight:600}
 @media print{body{background:#fff}.doc{box-shadow:none;margin:0;padding:0}.bar{display:none}}
 @media (max-width:640px){.doc{padding:20px 16px;margin:0}header,.parts{flex-direction:column}.totals{width:100%}th:nth-child(3),td:nth-child(3){display:none}}
@@ -83,7 +84,12 @@ def pressupost(pid: int) -> str:
             actual = l["partida_id"]
             files.append(f"<tr class='grup'><td colspan='5'>{_e((pm.get(actual) or {}).get('nom', 'Altres'))}</td></tr>")
         desc = f" <span class='muted'>(-{num(l['descompte_pct'])}%)</span>" if l["descompte_pct"] else ""
-        files.append(f"<tr><td>{_e(l['descripcio'])}</td><td class='r'>{num(l['quantitat'])} {_e(l['unitat'])}</td>"
+        extra = ""
+        if l.get("referencia"):
+            extra += f"<div class='muted'>Ref. {_e(l['referencia'])}</div>"
+        if l.get("foto_document_id"):
+            extra += f"<img class='foto-mat' src='/p/{_e(f['token'])}/fitxer/{l['foto_document_id']}' alt=''>"
+        files.append(f"<tr><td>{_e(l['descripcio'])}{extra}</td><td class='r'>{num(l['quantitat'])} {_e(l['unitat'])}</td>"
                      f"<td class='r'>{eur(l['preu_unitari'])}</td><td class='r'>{desc}</td><td class='r'>{eur(l['import'])}</td></tr>")
     titol = "PRESSUPOST FORA DE PRESSUPOST" if p["tipus"] == "extra" else "PRESSUPOST"
     estat = ""
@@ -134,7 +140,7 @@ def factura(fid: int) -> str:
 <tr><td>IVA {num(f['iva_pct'])}%</td><td class='r'>{eur(f['iva_import'])}</td></tr>
 {f"<tr><td>Retenció IRPF {num(f['irpf_pct'])}%</td><td class='r'>-{eur(f['irpf_import'])}</td></tr>" if f['irpf_import'] else ''}
 <tr class='t'><td>TOTAL</td><td class='r'>{eur(f['total'])}</td></tr></table>
-<div class='notes'>{('Forma de pagament: transferència al compte ' + _e(s.get('empresa_iban'))) if s.get('empresa_iban') else ''}
+<div class='notes'><b>Forma de pagament</b>{(' · Transferència: ' + _e(s.get('empresa_iban'))) if s.get('empresa_iban') else ''}{(' · Bizum: ' + _e(s.get('empresa_bizum'))) if s.get('empresa_bizum') else ''} · Concepte: {_e(f['codi'] or '')}
 {_e(f['notes'])}</div>"""
     return _pagina(f"Factura {f['codi'] or ''}", cos)
 

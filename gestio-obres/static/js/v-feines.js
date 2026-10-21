@@ -5,6 +5,9 @@ import {
 import { modalDespesa, modalHores, modalNovaFeina, modalSignatura } from "./forms.js";
 import { targetaFeina } from "./v-inici.js";
 import { modalFacturar } from "./v-factures.js";
+import { obreAssistent } from "./assistent.js";
+import { tabRender } from "./v-render.js";
+import { tabAnalisi, tabPlanning } from "./v-feina-extra.js";
 
 // ------------------------------------------------------------------ llista
 
@@ -37,8 +40,9 @@ export async function vistaFeines(el, _p, q, viva) {
 // ------------------------------------------------------------------ detall
 
 const PESTANYES = [
-  ["resum", "Resum"], ["pressupostos", "Pressupostos"], ["despeses", "Despeses"], ["hores", "Hores"],
-  ["albarans", "Albarans"], ["factures", "Factures"], ["missatges", "Missatges"], ["documents", "Documents"], ["dades", "Dades"],
+  ["resum", "Resum"], ["pressupostos", "Pressupostos"], ["planning", "Planning"], ["despeses", "Despeses"], ["hores", "Hores"],
+  ["albarans", "Albarans"], ["factures", "Factures"], ["missatges", "Missatges"], ["render", "Maqueta 3D"],
+  ["documents", "Documents"], ["analisi", "Anàlisi"], ["dades", "Dades"],
 ];
 
 export async function vistaFeina(el, [id, tab = "resum"], _q, viva) {
@@ -51,10 +55,12 @@ export async function vistaFeina(el, [id, tab = "resum"], _q, viva) {
         <div class="muted">${esc(f.codi)} · ${esc(f.client ? f.client.nom : "Sense client")} ${f.adreca ? "· " + esc(f.adreca) : ""}</div></div>
       <div class="accions-cap">
         <select data-estat class="estat-sel">${Object.entries(ESTATS_FEINA).map(([k, v]) => `<option value="${k}" ${k === f.estat ? "selected" : ""}>${v}</option>`).join("")}</select>
+        <button class="btn primari" data-assistent title="Digues què vols fer">🎙️</button>
         <button class="btn" data-comparteix>Enllaç client</button>
         ${f.estat !== "tancada" ? `<button class="btn" data-tanca>Tancar feina</button>` : ""}
       </div>
     </header>
+    ${f.bloquejos.length ? `<div class="bloquejos">${f.bloquejos.map((b) => `<div class="avis error">⛔ ${esc(b.text)}</div>`).join("")}</div>` : ""}
     <nav class="pestanyes">${PESTANYES.map(([k, t]) => `<a href="#/feina/${id}/${k}" class="${k === tab ? "actiu" : ""}">${t}${k === "missatges" && f.no_llegits ? ` <span class="punt">${f.no_llegits}</span>` : ""}</a>`).join("")}</nav>
     <div data-tab></div>`;
   el.querySelector("[data-estat]").onchange = async (e) => {
@@ -64,6 +70,7 @@ export async function vistaFeina(el, [id, tab = "resum"], _q, viva) {
     token: f.token, telefon: f.client?.telefon, email: f.client?.email, assumpte: f.nom,
     text: `Hola! Us passem l'enllaç per seguir la feina «${f.nom}».`,
   });
+  el.querySelector("[data-assistent]").onclick = () => obreAssistent(f.id);
   const bt = el.querySelector("[data-tanca]");
   if (bt) bt.onclick = () => tancaFeina(f);
   const cos = el.querySelector("[data-tab]");
@@ -83,10 +90,10 @@ async function tancaFeina(f) {
       <tr><td>Hores</td><td class="r">${num(r.hores_reals)} de ${num(r.hores_previstes)}</td></tr>
     </table>
     ${r.pendent_facturar > 0.01 ? `<p class="avis">⚠ Encara queda import per facturar. Factura-ho abans de tancar o tanca igualment.</p>` : ""}
-    <p class="muted">Es notificarà el tancament al client. Les dades d'aquesta feina serviran per millorar els pressupostos futurs.</p>`, {
+    <p class="muted">Es notificarà el tancament al client i es generarà l'anàlisi de la feina (què ha anat bé, què ha fallat i propostes per al proper pressupost).</p>`, {
     botons: [{ text: "Cancel·la" }, { text: "Tanca la feina", classe: "primari", accio: () => post(`/api/feines/${f.id}/tancar`, { forcar: true }) }],
   });
-  if (await m.done) { toast("Feina tancada"); location.hash = `#/feina/${f.id}/resum`; dispatchEvent(new HashChangeEvent("hashchange")); }
+  if (await m.done) { toast("Feina tancada. Aquí tens l'anàlisi."); location.hash = `#/feina/${f.id}/analisi`; }
 }
 
 // ------------------------------------------------------------------- resum
@@ -267,14 +274,16 @@ async function tabFactures(el, f) {
 
 // --------------------------------------------------------------- missatges
 
-const ICONES_MSG = { pressupost: "📄", acceptacio: "✅", rebuig: "❌", fora_pressupost: "⚠️", factura: "🧾", tancament: "🏁", nota: "📝" };
+const ICONES_MSG = { pressupost: "📄", acceptacio: "✅", rebuig: "❌", fora_pressupost: "⚠️", factura: "🧾", tancament: "🏁", nota: "📝",
+  evolucio: "🔨", pagament: "💶", valoracio: "⭐", peticio: "🙋" };
 
 async function tabMissatges(el, f, recarrega) {
   const ms = await get(`/api/feines/${f.id}/missatges`);
   el.innerHTML = `
     <div class="xat">${ms.length ? ms.map((m) => `
       <div class="msg ${m.autor} ${m.intern ? "intern" : ""} t-${m.tipus}">
-        <div class="bombolla">${ICONES_MSG[m.tipus] ? ICONES_MSG[m.tipus] + " " : ""}${esc(m.text)}</div>
+        <div class="bombolla">${ICONES_MSG[m.tipus] ? ICONES_MSG[m.tipus] + " " : ""}${esc(m.text)}
+          ${m.document_id ? `<a href="/api/documents/${m.document_id}/fitxer" target="_blank"><img class="foto-msg" src="/api/documents/${m.document_id}/fitxer" alt=""></a>` : ""}</div>
         <small>${m.autor === "client" ? "Client" : m.autor === "empresa" ? "Nosaltres" : "Sistema"}${m.intern ? " · nota interna" : ""} · ${dataHora(m.created_at)}</small>
       </div>`).join("") : buit("Encara no hi ha missatges.")}</div>
     <form class="enviar-msg">
@@ -365,4 +374,5 @@ async function tabDades(el, f) {
 const TABS = {
   resum: tabResum, pressupostos: tabPressupostos, despeses: tabDespeses, hores: tabHores, albarans: tabAlbarans,
   factures: tabFactures, missatges: tabMissatges, documents: tabDocuments, dades: tabDades,
+  planning: tabPlanning, render: tabRender, analisi: tabAnalisi,
 };

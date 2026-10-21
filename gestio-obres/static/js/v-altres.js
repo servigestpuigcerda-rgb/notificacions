@@ -154,8 +154,57 @@ export async function vistaImpostos(el, _p, _q, viva) {
   el.innerHTML = `<header class="cap"><h1>Impostos</h1></header>
     <div class="filtres"><select data-any>${[any, any - 1, any - 2].map((a) => `<option>${a}</option>`).join("")}</select>
       <select data-tri><option value="">Tot l'any</option>${[1, 2, 3, 4].map((t) => `<option value="${t}" ${t === tri ? "selected" : ""}>${t}T</option>`).join("")}</select></div>
+    <div data-est></div>
+    <div class="targeta"><div class="barra-accions"><h2>Enviar al gestor</h2>
+      <button class="btn primari" data-gestor>📤 Envia el paquet del període</button><button class="btn" data-descarrega>Descarrega ZIP</button></div>
+      <p class="muted">Factures de venda, factures i tiquets de compra (amb les fotos), llibres de registre en CSV i el resum d'impostos.
+      ${state.settings.gestor_email ? `Gestor: ${esc(state.settings.gestor_nom || "")} &lt;${esc(state.settings.gestor_email)}&gt;` : `Posa el correu del gestor a Configuració.`}</p></div>
     <div data-r></div>`;
+  const estimacio = async () => {
+    const t = el.querySelector("[data-tri]").value;
+    const box = el.querySelector("[data-est]");
+    if (!t) { box.innerHTML = ""; return; }
+    const e = await get(`/api/impostos/estimacio?any=${el.querySelector("[data-any]").value}&trimestre=${t}`);
+    if (!viva()) return;
+    const fila = (nom, k) => `<tr><td>${nom}</td><td class="r">${eur(e.real[k])}</td>${e.en_curs ? `<td class="r"><b>${eur(e.projeccio[k])}</b></td>` : ""}</tr>`;
+    box.innerHTML = `<div class="targeta destacada"><h2>Estimació ${t}T ${e.any}</h2>
+      ${e.en_curs ? `<p class="muted">Trimestre en curs (${e.dies.transcorreguts} de ${e.dies.total} dies). La projecció suposa que la resta del trimestre segueix el mateix ritme.</p>` : ""}
+      <table class="taula"><thead><tr><th></th><th class="r">Fins avui</th>${e.en_curs ? `<th class="r">Projecció final</th>` : ""}</tr></thead><tbody>
+        ${fila("IVA repercutit", "iva_repercutit")}${fila("IVA suportat", "iva_suportat")}
+        <tr class="destacat"><td><b>IVA a pagar (303)</b></td><td class="r"><b>${eur(e.real.iva_resultat)}</b></td>${e.en_curs ? `<td class="r"><b>${eur(e.projeccio.iva_resultat)}</b></td>` : ""}</tr>
+        ${e.regim === "autonom" ? `<tr class="destacat"><td><b>IRPF pagament fraccionat (130, ${num(e.irpf_pct)}%)</b></td><td class="r"><b>${eur(e.real.irpf_130)}</b></td>${e.en_curs ? `<td class="r"><b>${eur(e.projeccio.irpf_130)}</b></td>` : ""}</tr>`
+          : `<tr><td colspan="3" class="muted">Societat: no hi ha model 130; l'Impost de Societats es calcula a l'any.</td></tr>`}
+        ${fila("Ingressos (base)", "ingressos")}${fila("Despeses (base)", "despeses")}
+      </tbody></table>
+      ${e.esborranys.n ? `<p class="muted">Hi ha ${e.esborranys.n} factura(es) en esborrany (${eur(e.esborranys.base)} de base, ${eur(e.esborranys.iva)} d'IVA) que encara no compten.</p>` : ""}
+      <p class="muted">Estimació orientativa: no inclou nòmines, quotes d'autònom, amortitzacions ni altres despeses que no siguin a l'app.</p></div>`;
+  };
+  const paquet = async () => {
+    const qs = `any=${el.querySelector("[data-any]").value}&trimestre=${el.querySelector("[data-tri]").value}`;
+    const r = await fetch(`/api/gestor/paquet?${qs}`, { credentials: "same-origin" });
+    if (!r.ok) throw new Error("No s'ha pogut generar el paquet.");
+    const nom = (r.headers.get("Content-Disposition") || "").match(/filename="(.+)"/)?.[1] || "gestor.zip";
+    return new File([await r.blob()], nom, { type: "application/zip" });
+  };
+  const descarrega = (file) => { const a = document.createElement("a"); a.href = URL.createObjectURL(file); a.download = file.name; a.click(); };
+  el.querySelector("[data-descarrega]").onclick = () => paquet().then(descarrega).catch(errorToast);
+  el.querySelector("[data-gestor]").onclick = async () => {
+    try {
+      const file = await paquet();
+      const t = el.querySelector("[data-tri]").value;
+      const periode = `${t ? t + "T " : ""}${el.querySelector("[data-any]").value}`;
+      const text = `Hola${state.settings.gestor_nom ? " " + state.settings.gestor_nom : ""}, us envio les factures de venda i compra i els tiquets del període ${periode}, amb els llibres de registre i el resum d'impostos.`;
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: `Documentació ${periode}`, text });
+      } else {
+        descarrega(file);
+        location.href = `mailto:${encodeURIComponent(state.settings.gestor_email || "")}?subject=${encodeURIComponent("Documentació " + periode)}&body=${encodeURIComponent(text + "\n\n(Adjunto el fitxer " + file.name + ")")}`;
+        toast("S'ha descarregat el ZIP: adjunta'l al correu.");
+      }
+    } catch (e) { if (e.name !== "AbortError") errorToast(e); }
+  };
   const carrega = async () => {
+    estimacio().catch(errorToast);
     const r = await get(`/api/impostos?any=${el.querySelector("[data-any]").value}&trimestre=${el.querySelector("[data-tri]").value}`);
     if (!viva()) return;
     const taula = (rows, irpf) => rows.length ? `<table class="taula"><thead><tr><th>IVA</th><th class="r">Docs</th><th class="r">Base</th><th class="r">Quota</th>${irpf ? `<th class="r">IRPF</th>` : ""}</tr></thead>
@@ -219,6 +268,11 @@ export async function vistaConfig(el, _p, _q, viva) {
       <div class="dues">${camp("empresa_nif", "NIF")}${camp("empresa_telefon", "Telèfon")}</div>
       ${camp("empresa_adreca", "Adreça")}
       <div class="dues">${camp("empresa_email", "Correu")}${camp("empresa_iban", "IBAN (per a les factures)")}</div>
+      <div class="dues">${camp("empresa_bizum", "Telèfon Bizum per cobrar")}
+        <label>Règim fiscal<select name="regim_fiscal" ${admin ? "" : "disabled"}><option value="autonom" ${s.regim_fiscal !== "societat" ? "selected" : ""}>Autònom (IRPF, model 130)</option>
+          <option value="societat" ${s.regim_fiscal === "societat" ? "selected" : ""}>Societat (SL, SA…)</option></select></label></div>
+      <h2>Gestor</h2>
+      <div class="dues">${camp("gestor_nom", "Nom de la gestoria")}${camp("gestor_email", "Correu del gestor", 'type="email"')}</div>
       <h2>Valors per defecte</h2>
       <div class="tres">${camp("iva_defecte", "IVA %", 'inputmode="decimal"')}${camp("irpf_defecte", "IRPF %", 'inputmode="decimal"')}${camp("marge_defecte", "Marge material %", 'inputmode="decimal"')}</div>
       <div class="tres">${camp("cost_hora_defecte", "Cost hora €", 'inputmode="decimal"')}${camp("preu_hora_defecte", "Preu venda hora €", 'inputmode="decimal"')}${camp("serie_factura", "Sèrie factures")}</div>

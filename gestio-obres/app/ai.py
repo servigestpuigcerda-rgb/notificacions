@@ -185,7 +185,11 @@ def _context_pressupost(text: str, tipus: str | None) -> str:
         "preu_hora": db.setting_float("preu_hora_defecte", 38),
         "marge_defecte_pct": db.setting_float("marge_defecte", 20),
     }
+    propostes = [p for a in db.rows("SELECT a.text_json FROM analisis a JOIN feines f ON f.id = a.feina_id "
+                                    "WHERE (? IS NULL OR lower(f.tipus) = lower(?)) ORDER BY a.id DESC LIMIT 5", (tipus, tipus))
+                 for p in json.loads(a["text_json"]).get("propostes", [])]
     return (f"Tarifes: {json.dumps(tarifes)}\n"
+            f"Lliçons de les anàlisis de feines acabades: {json.dumps(propostes, ensure_ascii=False)}\n"
             f"Partides: {json.dumps(partides, ensure_ascii=False)}\n"
             f"Catàleg d'articles: {json.dumps(articles, ensure_ascii=False)}\n"
             f"Desviació històrica (ràtio real/pressupostat; >1 vol dir que ens quedem curts): {json.dumps(hist, ensure_ascii=False)}\n"
@@ -228,3 +232,216 @@ def revisar_pressupost_ia(pressupost_id: int) -> dict:
                f"Semblants: {json.dumps(revisio['semblants'], ensure_ascii=False)}\n"
                "Revisa'l: què falta, què sembla curt d'hores o de material, errors de preu o quantitat.")
     return _parse(RevisioIA, content, SYSTEM_PRESSUPOST, effort="high").model_dump()
+
+
+# ---------------------------------------------------------------- assistent
+
+TIPUS_ACCIO = Literal["afegir_hores", "afegir_linia_pressupost", "modificar_linia_pressupost", "eliminar_linia_pressupost",
+                      "afegir_linia_factura", "afegir_despesa", "afegir_missatge", "afegir_planning",
+                      "canviar_estat_feina", "crear_feina"]
+
+
+class AccioAssistent(BaseModel):
+    tipus: TIPUS_ACCIO
+    resum: str = Field(description="Què es farà, en una frase en català, per confirmar-ho amb l'usuari")
+    feina_codi: Optional[str] = Field(default=None, description="Codi de la feina si la pots identificar a la llista")
+    feina_text: Optional[str] = Field(default=None, description="Com ha anomenat l'usuari la feina o el client (literal)")
+    pressupost_numero: Optional[str] = None
+    linia_index: Optional[int] = Field(default=None, description="Número de línia (1 = primera) per modificar o eliminar")
+    descripcio: Optional[str] = None
+    referencia: Optional[str] = Field(default=None, description="Referència o model del material")
+    partida: Optional[str] = Field(default=None, description="Nom exacte d'una partida")
+    quantitat: Optional[float] = None
+    unitat: Optional[str] = None
+    cost_unitari: Optional[float] = None
+    preu_unitari: Optional[float] = None
+    descompte_pct: Optional[float] = None
+    hores: Optional[float] = None
+    data: Optional[str] = Field(default=None, description="AAAA-MM-DD")
+    treballador_text: Optional[str] = Field(default=None, description="Nom del treballador tal com l'ha dit l'usuari")
+    facturable: Optional[bool] = None
+    proveidor: Optional[str] = None
+    import_total: Optional[float] = Field(default=None, description="Import amb IVA d'una despesa")
+    text: Optional[str] = Field(default=None, description="Text del missatge, nota o tasca")
+    intern: Optional[bool] = Field(default=None, description="true = nota interna que el client no veu")
+    estat: Optional[str] = Field(default=None, description="pressupost, acceptada, en_curs, acabada, tancada")
+    data_fi: Optional[str] = None
+
+
+class RespostaAssistent(BaseModel):
+    accions: List[AccioAssistent]
+    dubtes: List[str] = Field(default=[], description="Què no està clar i cal preguntar")
+
+
+SYSTEM_ASSISTENT = """Ets l'assistent d'una aplicació de gestió d'obres. L'usuari et diu (sovint dictat i informal) què vol fer
+i tu ho converteixes en accions concretes. No executes res: l'usuari les revisarà i confirmarà.
+Regles:
+- Una ordre pot generar diverses accions.
+- Identifica la feina pel codi de la llista quan sigui clar. Si l'usuari parla d'un client o d'una adreça que no surt a la llista,
+  posa el text literal a "feina_text" (el sistema el buscarà) i deixa feina_codi buit.
+- "Afegeix X al pressupost": afegir_linia_pressupost. Si el pressupost ja està acceptat, igualment proposa-la (el sistema crearà un fora de pressupost).
+- Per modificar o eliminar línies fes servir linia_index de la llista de línies que et dono.
+- Mà d'obra: unitat "h" i partida de mà d'obra. Si no et diuen preu, deixa'l buit (s'aplicaran les tarifes).
+- Avui és {avui}. Converteix "ahir", "dilluns"... a dates.
+- No inventis imports ni quantitats que no s'han dit; si falten, deixa-ho buit o pregunta-ho a "dubtes"."""
+
+
+def _context_assistent(feina_id: int | None) -> str:
+    feines = db.rows("SELECT id, codi, nom, tipus, estat FROM feines WHERE estat IN ('pressupost','acceptada','en_curs','acabada') "
+                     "ORDER BY (id = ?) DESC, created_at DESC LIMIT 40", (feina_id or 0,))
+    ctx = []
+    for f in feines:
+        d = {"codi": f["codi"], "nom": f["nom"], "tipus": f["tipus"], "estat": f["estat"]}
+        if f["id"] == feina_id or len(ctx) < 12:
+            ps = db.rows("SELECT id, numero, tipus, estat FROM pressupostos WHERE feina_id = ? ORDER BY id DESC LIMIT 3", (f["id"],))
+            d["pressupostos"] = [{"numero": p["numero"], "tipus": p["tipus"], "estat": p["estat"],
+                                  "linies": [f"{i}. {l['descripcio']} · {l['quantitat']:g} {l['unitat']} · {l['preu_unitari']:g} €"
+                                             for i, l in enumerate(db.rows("SELECT * FROM linies_pressupost WHERE pressupost_id = ? "
+                                                                           "ORDER BY ordre, id", (p["id"],)), 1)]} for p in ps]
+            fe = db.rows("SELECT id, codi FROM factures WHERE feina_id = ? AND estat = 'esborrany'", (f["id"],))
+            if fe:
+                d["factures_esborrany"] = len(fe)
+        ctx.append(d)
+    partides = [p["nom"] for p in db.rows("SELECT nom FROM partides ORDER BY ordre")]
+    actual = next((f["codi"] for f in feines if f["id"] == feina_id), None)
+    return (f"Feina oberta a la pantalla ara mateix: {actual or 'cap'}\n"
+            f"Partides: {json.dumps(partides, ensure_ascii=False)}\n"
+            f"Feines obertes: {json.dumps(ctx, ensure_ascii=False)}\n")
+
+
+def interpretar_ordre(text: str, feina_id: int | None = None) -> dict:
+    if not text or len(text.strip()) < 3:
+        raise IAError("No t'he entès. Digues què vols fer.")
+    system = SYSTEM_ASSISTENT.replace("{avui}", db.today())
+    content = _context_assistent(feina_id) + f"\nOrdre de l'usuari:\n\"\"\"\n{text.strip()}\n\"\"\""
+    return _parse(RespostaAssistent, content, system, effort="medium").model_dump()
+
+
+# -------------------------------------------------------------- maqueta 3D
+
+PARET = Literal["nord", "sud", "est", "oest"]
+TIPUS_ELEMENT = Literal["plat_dutxa", "banyera", "lavabo", "moble_lavabo", "wc", "bidet", "mampara", "mirall",
+                        "armari_baix", "armari_alt", "taulell", "pica", "placa", "forn", "nevera", "rentadora",
+                        "radiador", "prestatge", "taula", "cadira", "sofa", "llit", "illa", "columna", "altre"]
+
+
+class MaterialRender(BaseModel):
+    id: str = Field(description="Identificador curt, p. ex. m1")
+    nom: str
+    tipus: Literal["ceramica", "pintura", "fusta", "pedra", "metall", "vidre", "laminat", "altres"]
+    color: str = Field(description="Color hexadecimal #rrggbb")
+    patro: Literal["llis", "rajola", "llistons"] = "llis"
+    mida_peca_cm: Optional[float] = Field(default=None, description="Amplada de la peça (rajola, llistó)")
+    mida_peca_alt_cm: Optional[float] = None
+    color_junta: Optional[str] = None
+    brillant: bool = False
+    article_id: Optional[int] = None
+    foto_document_id: Optional[int] = None
+
+
+class Obertura(BaseModel):
+    paret: PARET
+    tipus: Literal["porta", "finestra"]
+    posicio: float = Field(description="Distància en metres des de l'inici de la paret fins al centre de l'obertura")
+    amplada: float
+    alcada: float
+    alcada_terra: float = 0
+
+
+class ElementRender(BaseModel):
+    id: str
+    tipus: TIPUS_ELEMENT
+    nom: str
+    paret: Optional[PARET] = Field(default=None, description="Paret on està recolzat; buit si està al mig")
+    posicio: Optional[float] = Field(default=None, description="Metres des de l'inici de la paret fins al centre de l'element")
+    x: Optional[float] = Field(default=None, description="Només si no té paret: centre en metres des de la paret oest")
+    y: Optional[float] = Field(default=None, description="Només si no té paret: centre en metres des de la paret sud")
+    amplada: float
+    fondaria: float
+    alcada: float
+    alcada_terra: float = 0
+    material_id: Optional[str] = None
+
+
+class Acabats(BaseModel):
+    terra: Optional[str] = Field(default=None, description="id de material")
+    parets: Optional[str] = None
+    sostre: Optional[str] = None
+    zona_humida: Optional[str] = Field(default=None, description="Material d'una zona diferenciada (p. ex. dutxa)")
+    zona_humida_parets: List[PARET] = []
+    zona_humida_alcada: Optional[float] = None
+
+
+class Estanca(BaseModel):
+    nom: str
+    amplada: float = Field(description="Metres, eix est-oest (paret sud i nord)")
+    llargada: float = Field(description="Metres, eix nord-sud (paret oest i est)")
+    alcada: float
+
+
+class ModelRender(BaseModel):
+    estanca: Estanca
+    obertures: List[Obertura] = []
+    elements: List[ElementRender] = []
+    materials: List[MaterialRender]
+    acabats: Acabats
+    suposits: List[str] = Field(default=[], description="Mides o posicions suposades que cal confirmar")
+
+
+SYSTEM_RENDER = """Ets un interiorista tècnic. A partir de fotos de l'estat actual, les mides i la descripció del resultat desitjat,
+defineixes una maqueta 3D senzilla de l'estança TAL COM QUEDARÀ un cop acabada la feina.
+Sistema de coordenades:
+- La paret sud és la de y=0 i la nord la de y=llargada; l'oest és x=0 i l'est x=amplada.
+- Situa la porta principal a la paret sud si no se sap.
+- "posicio" a les parets sud i nord es mesura des de l'oest; a les parets est i oest, des del sud.
+- Els elements recolzats a una paret porten "paret" i "posicio"; la fondària és perpendicular a la paret.
+Regles:
+- Respecta les mides donades. Les que no tinguis, estima-les de les fotos i posa-ho a "suposits".
+- Fes servir mides reals estàndard (lavabo 60x45, plat dutxa 140x80 o la mida dita, vàter 37x65...).
+- Defineix materials realistes amb colors hexadecimals; per a rajoles indica patró "rajola" i la mida de la peça.
+- Si hi ha articles del catàleg amb foto que encaixen, posa article_id i foto_document_id."""
+
+
+def _materials_cataleg() -> list:
+    return db.rows("SELECT a.id AS article_id, a.nom, a.unitat, d.id AS foto_document_id FROM articles a "
+                   "LEFT JOIN documents d ON d.id = (SELECT lp.foto_document_id FROM linies_pressupost lp "
+                   "WHERE lp.article_id = a.id AND lp.foto_document_id IS NOT NULL ORDER BY lp.id DESC LIMIT 1) "
+                   "WHERE a.actiu = 1 ORDER BY a.nom LIMIT 150")
+
+
+def generar_render(fotos: list, mesures: str, descripcio: str) -> dict:
+    """fotos: [(bytes, mime)]"""
+    blocs = []
+    for contingut, mime in fotos[:6]:
+        blocs.append({"type": "image", "source": {"type": "base64", "media_type": mime,
+                                                  "data": base64.standard_b64encode(contingut).decode()}})
+    text = (f"Mides i observacions: {mesures or '(no n’hi ha; estima-les)'}\n"
+            f"Resultat desitjat: {descripcio or '(el que es dedueixi del pressupost)'}\n"
+            f"Catàleg de materials: {json.dumps(_materials_cataleg(), ensure_ascii=False)}")
+    blocs.append({"type": "text", "text": text})
+    return _parse(ModelRender, blocs, SYSTEM_RENDER, effort="high", max_tokens=32000).model_dump()
+
+
+def modificar_render(model: dict, instruccio: str) -> dict:
+    content = (f"Model actual: {json.dumps(model, ensure_ascii=False)}\n"
+               f"Catàleg de materials: {json.dumps(_materials_cataleg(), ensure_ascii=False)}\n"
+               f"Canvi demanat: {instruccio}\nTorna el model complet amb el canvi aplicat.")
+    return _parse(ModelRender, content, SYSTEM_RENDER, effort="medium", max_tokens=32000).model_dump()
+
+
+# ------------------------------------------------------------ anàlisi final
+
+class AnalisiIA(BaseModel):
+    resum: str = Field(description="Valoració global de la feina en 2-3 frases")
+    be: List[str] = Field(description="Què ha anat bé")
+    malament: List[str] = Field(description="Què ha fallat o es pot millorar")
+    propostes: List[str] = Field(description="Canvis concrets per al proper pressupost d'aquest tipus de feina")
+
+
+def analisi_tancament(dades: dict) -> dict:
+    content = ("Dades objectives de la feina acabada (sense dades personals):\n"
+               f"{json.dumps({k: v for k, v in dades.items() if k != 'comentaris_client'}, ensure_ascii=False)}\n"
+               f"Comentaris del client: {json.dumps(dades.get('comentaris_client', []), ensure_ascii=False)}\n"
+               "Fes l'anàlisi de tancament: què ha anat bé, què ha fallat i propostes concretes (amb xifres) per al proper pressupost.")
+    return _parse(AnalisiIA, content, "Ets un cap d'obra i gestor que analitza la rendibilitat de les feines acabades.",
+                  effort="high").model_dump()

@@ -1,5 +1,5 @@
 import {
-  badge, compartir, confirma, del, errorToast, esc, eur, ESTATS_PRESSUPOST, get, modal, num, obre, opcions, parseNum,
+  api, comprimeixImatge, badge, compartir, confirma, del, errorToast, esc, eur, ESTATS_PRESSUPOST, get, modal, num, obre, opcions, parseNum,
   pct, post, put, r2, state, toast, debounce,
 } from "./core.js";
 
@@ -113,7 +113,15 @@ export async function vistaPressupost(el, [id], _q, viva) {
 
   const filaHtml = (l, i) => `
     <div class="linia" data-i="${i}">
-      <textarea data-f="descripcio" rows="1" placeholder="Descripció" ${bloquejat ? "disabled" : ""}>${esc(l.descripcio)}</textarea>
+      <div class="desc-cel">
+        <textarea data-f="descripcio" rows="1" placeholder="Descripció" ${bloquejat ? "disabled" : ""}>${esc(l.descripcio)}</textarea>
+        <div class="ref-fila">
+          ${l.foto_document_id ? `<a href="/api/documents/${l.foto_document_id}/fitxer" target="_blank"><img class="mini-foto" src="/api/documents/${l.foto_document_id}/fitxer" alt="foto"></a>` : ""}
+          <input data-f="referencia" placeholder="Ref. / model del material" value="${esc(l.referencia || "")}" ${bloquejat ? "disabled" : ""}>
+          ${!bloquejat ? `<label class="btn-icon" title="Foto del material">📷<input type="file" accept="image/*" hidden data-foto></label>
+            ${l.foto_document_id ? `<button class="btn-icon" data-treu-foto title="Treu la foto">⨯</button>` : ""}` : ""}
+        </div>
+      </div>
       <select data-f="partida_id" ${bloquejat ? "disabled" : ""}>${opcions(state.partides, l.partida_id, { buit: "—" })}</select>
       <label class="mob">Quant.<input data-f="quantitat" inputmode="decimal" value="${l.quantitat}" ${bloquejat ? "disabled" : ""}></label>
       <label class="mob">Unitat<input data-f="unitat" value="${esc(l.unitat)}" ${bloquejat ? "disabled" : ""}></label>
@@ -136,7 +144,8 @@ export async function vistaPressupost(el, [id], _q, viva) {
     const fila = e.target.closest("[data-i]"); if (!fila) return;
     const l = linies[+fila.dataset.i], camp = e.target.dataset.f;
     const v = e.target.value;
-    if (["descripcio", "unitat"].includes(camp)) l[camp] = v;
+    if (!camp) return;
+    if (["descripcio", "unitat", "referencia"].includes(camp)) l[camp] = v;
     else if (camp === "partida_id") l[camp] = v ? +v : null;
     else {
       l[camp] = parseNum(v) ?? 0;
@@ -149,11 +158,24 @@ export async function vistaPressupost(el, [id], _q, viva) {
     if (e.target.tagName === "TEXTAREA") { e.target.style.height = "auto"; e.target.style.height = e.target.scrollHeight + "px"; }
     marca(); pintaTotals();
   });
-  cont.addEventListener("change", (e) => { if (e.target.tagName === "SELECT") { marca(); } });
+  cont.addEventListener("change", async (e) => {
+    if (e.target.tagName === "SELECT") { marca(); return; }
+    if (e.target.matches("[data-foto]") && e.target.files[0]) {
+      const i = +e.target.closest("[data-i]").dataset.i;
+      try {
+        const fd = new FormData();
+        fd.append("fitxer", await comprimeixImatge(e.target.files[0], 1400));
+        const r = await api("POST", `/api/pressupostos/${id}/foto`, fd);
+        linies[i].foto_document_id = r.document_id;
+        marca(); pinta(); toast("Foto afegida");
+      } catch (err) { errorToast(err); }
+    }
+  });
   cont.addEventListener("click", (e) => {
     const fila = e.target.closest("[data-i]"); if (!fila) return;
     const i = +fila.dataset.i;
     if (e.target.closest("[data-treu]")) { linies.splice(i, 1); marca(); pinta(); }
+    if (e.target.closest("[data-treu-foto]")) { linies[i].foto_document_id = null; marca(); pinta(); }
     if (e.target.closest("[data-amunt]") && i > 0) { [linies[i - 1], linies[i]] = [linies[i], linies[i - 1]]; marca(); pinta(); }
   });
   el.querySelectorAll("[data-cap]").forEach((i) => i.addEventListener("input", () => { marca(); pintaTotals(); }));

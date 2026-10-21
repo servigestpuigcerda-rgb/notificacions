@@ -17,7 +17,7 @@ from .auth import admin, usuari_actual
 
 STATIC = Path(__file__).resolve().parent.parent / "static"
 MAX_UPLOAD = 15 * 1024 * 1024
-TIPUS_DOCS = ("tiquet", "factura_proveidor", "albara_proveidor", "foto", "pressupost", "factura", "albara", "altres")
+TIPUS_DOCS = ("tiquet", "factura_proveidor", "albara_proveidor", "foto", "material", "pressupost", "factura", "albara", "altres")
 
 
 
@@ -354,6 +354,8 @@ def get_feina(fid: int, u=Depends(usuari_actual)):
     f["client"] = db.row("SELECT * FROM clients WHERE id = ?", (f["client_id"],)) if f["client_id"] else None
     f["resum"] = calc.resum_feina(fid)
     f["no_llegits"] = db.scalar("SELECT COUNT(*) FROM missatges WHERE feina_id = ? AND llegit = 0", (fid,))
+    f["bloquejos"] = calc.bloquejos(fid)
+    f["valoracio"] = db.row("SELECT COUNT(*) AS n, AVG(puntuacio) AS mitjana FROM valoracions WHERE feina_id = ?", (fid,))
     return f
 
 
@@ -377,6 +379,8 @@ def tancar_feina(fid: int, data: dict = Body(default={}), u=Depends(usuari_actua
     missatge(fid, f"Tancament: contractat {printing.eur(r['contractat'])}, cost real {printing.eur(r['cost_real'])}, "
                   f"facturat {printing.eur(r['facturat'])}, resultat {printing.eur(r['facturat'] - r['cost_real'])}. "
                   f"Hores {r['hores_reals']} de {r['hores_previstes']} previstes.", "nota", intern=True)
+    from .api2 import genera_analisi
+    genera_analisi(fid)
     return {"ok": True}
 
 
@@ -385,7 +389,8 @@ def tancar_feina(fid: int, data: dict = Body(default={}), u=Depends(usuari_actua
 CAMPS_PRESSUPOST = {"titol": str, "data": str, "validesa_dies": int, "descompte_pct": float, "iva_pct": float,
                     "irpf_pct": float, "notes": str, "condicions": str, "text_origen": str}
 CAMPS_LINIA = {"article_id": int, "partida_id": int, "descripcio": str, "quantitat": float, "unitat": str,
-               "cost_unitari": float, "marge_pct": float, "preu_unitari": float, "descompte_pct": float}
+               "cost_unitari": float, "marge_pct": float, "preu_unitari": float, "descompte_pct": float,
+               "referencia": str, "foto_document_id": int}
 
 
 def _guarda_linies(pid: int, linies: list):
@@ -1164,7 +1169,14 @@ def inici(u=Depends(usuari_actual)):
     pendents_revisar = db.scalar("SELECT COUNT(*) FROM despeses WHERE estat = 'pendent_revisio' OR feina_id IS NULL OR partida_id IS NULL")
     pressupostos_enviats = db.rows("SELECT p.id, p.numero, p.titol, p.enviat_at, p.tipus, f.id AS feina_id, f.nom AS feina_nom "
                                    "FROM pressupostos p JOIN feines f ON f.id = p.feina_id WHERE p.estat = 'enviat' ORDER BY p.enviat_at")
-    return {"feines": feines, "alertes": alertes, "totals": {k: calc.r2(v) for k, v in tot.items()},
+    bloquejades = []
+    for f in feines:
+        b = calc.bloquejos(f["id"])
+        if b:
+            bloquejades.append({"feina_id": f["id"], "feina": f"{f['codi']} {f['nom']}", "bloquejos": b})
+    pagaments = db.rows("SELECT fa.id, fa.codi, fa.total, fa.pagament_notificat_at, fe.nom AS feina_nom FROM factures fa "
+                        "LEFT JOIN feines fe ON fe.id = fa.feina_id WHERE fa.estat = 'emesa' AND fa.pagament_notificat_at IS NOT NULL")
+    return {"feines": feines, "alertes": alertes, "bloquejades": bloquejades, "pagaments_notificats": pagaments, "totals": {k: calc.r2(v) for k, v in tot.items()},
             "no_llegits": no_llegits, "pendents_cobrar": pendents_cobrar, "despeses_pendents": pendents_revisar,
             "pressupostos_enviats": pressupostos_enviats, "hores_avui": db.scalar(
                 "SELECT COALESCE(SUM(hores),0) FROM hores WHERE data = ? AND usuari_id = ?", (avui, u["id"]))}
@@ -1220,15 +1232,26 @@ def portal(token: str):
         t = calc.totals_pressupost(p["id"])
         p["total"] = t["total"]
         p["base"] = t["base"]
-    fact = db.rows("SELECT id, codi, data, venciment, total, estat FROM factures WHERE feina_id = ? AND estat IN "
+    fact = db.rows("SELECT id, codi, data, venciment, total, estat, pagament_notificat_at FROM factures WHERE feina_id = ? AND estat IN "
                    "('emesa','cobrada','anullada') ORDER BY data", (f["id"],))
     alb = db.rows("SELECT id, numero, data, descripcio, estat, signat_per FROM albarans WHERE feina_id = ? ORDER BY data", (f["id"],))
-    msgs = db.rows("SELECT autor, tipus, text, created_at FROM missatges WHERE feina_id = ? AND intern = 0 ORDER BY created_at, id", (f["id"],))
+    msgs = db.rows("SELECT autor, tipus, text, document_id, created_at FROM missatges WHERE feina_id = ? AND intern = 0 "
+                   "ORDER BY created_at, id", (f["id"],))
     r = calc.resum_feina(f["id"])
     s = db.settings()
-    return {"feina": {"codi": f["codi"], "nom": f["nom"], "estat": f["estat"], "adreca": f["adreca"]},
+    planning = db.rows("SELECT titol, data_inici, data_fi, estat, pct FROM planning WHERE feina_id = ? "
+                       "ORDER BY ordre, COALESCE(data_inici, '9999'), id", (f["id"],))
+    return {"feina": {"codi": f["codi"], "nom": f["nom"], "estat": f["estat"], "adreca": f["adreca"],
+                      "data_inici": f["data_inici"], "data_fi": f["data_fi"]},
             "empresa": {"nom": s.get("empresa_nom"), "telefon": s.get("empresa_telefon"), "email": s.get("empresa_email")},
+            "pagament": {"iban": s.get("empresa_iban"), "bizum": s.get("empresa_bizum"), "titular": s.get("empresa_nom")},
             "pressupostos": pres, "factures": fact, "albarans": alb, "missatges": msgs,
+            "bloquejos": calc.bloquejos(f["id"]), "pendent": calc.pendent_client(f["id"]),
+            "planning": planning,
+            "progres": round(sum(t["pct"] for t in planning) / len(planning)) if planning else None,
+            "evolucio": [x for x in msgs if x["tipus"] == "evolucio"],
+            "valoracions": db.rows("SELECT puntuacio, comentari, created_at FROM valoracions WHERE feina_id = ? ORDER BY created_at DESC", (f["id"],)),
+            "renders": db.rows("SELECT id, titol FROM renders WHERE feina_id = ? AND visible_client = 1 ORDER BY id DESC", (f["id"],)),
             "resum": {"contractat": r["contractat"], "facturat": r["facturat_total"], "cobrat": r["cobrat"],
                       "pendent_cobrar": r["pendent_cobrar"]}}
 
@@ -1316,3 +1339,8 @@ def favicon():
 @app.get("/sw.js")
 def service_worker():
     return FileResponse(STATIC / "sw.js", media_type="application/javascript", headers={"Service-Worker-Allowed": "/"})
+
+
+from . import api2  # noqa: E402  (rutes addicionals; s'importa al final per evitar cicles)
+
+app.include_router(api2.router)

@@ -278,3 +278,173 @@ def resum_impostos(any_: int, trimestre: int | None = None) -> dict:
                          "només és deduïble l'IVA de factures completes o simplificades amb les dades del destinatari."
                          if sense_fra["n"] else None),
     }
+
+
+# ------------------------------------------------------------ bloquejos
+
+def _eur(v) -> str:
+    return f"{(v or 0):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") + " €"
+
+
+def bloquejos(feina_id: int) -> list:
+    """El que el client ha de fer perquè la feina comenci o continuï."""
+    res = []
+    for p in db.rows("SELECT id, numero, tipus, titol FROM pressupostos WHERE feina_id = ? AND estat = 'enviat' ORDER BY id",
+                     (feina_id,)):
+        t = totals_pressupost(p["id"])
+        if p["tipus"] == "principal":
+            res.append({"tipus": "pressupost", "ref_id": p["id"],
+                        "text": f"Pendent d'acceptar el pressupost {p['numero']} ({_eur(t['total'])}). "
+                                "La feina no es pot començar fins que l'accepteu."})
+        else:
+            res.append({"tipus": "canvi", "ref_id": p["id"],
+                        "text": f"Pendent d'acceptar els canvis {p['numero']} {p['titol'] or ''} ({_eur(t['total'])}). "
+                                "Aquests treballs no es faran, i si afecten la resta, la feina queda aturada, fins que els accepteu."})
+    for f in db.rows("SELECT id, codi, total, venciment FROM factures WHERE feina_id = ? AND estat = 'emesa' AND bloqueja = 1 "
+                     "AND rectifica_id IS NULL ORDER BY data", (feina_id,)):
+        res.append({"tipus": "pagament", "ref_id": f["id"],
+                    "text": f"Pendent de pagament la factura {f['codi']} ({_eur(f['total'])}). "
+                            "La feina es reprendrà quan rebem l'ingrés."})
+    return res
+
+
+def pendent_client(feina_id: int) -> dict:
+    """Què li queda al client: factures per pagar i resta de l'obra per facturar (IVA inclòs, aproximat)."""
+    per_pagar = db.scalar("SELECT COALESCE(SUM(total),0) FROM factures WHERE feina_id = ? AND estat = 'emesa'", (feina_id,))
+    p = db.row("SELECT iva_pct, irpf_pct FROM pressupostos WHERE feina_id = ? AND estat = 'acceptat' ORDER BY id LIMIT 1", (feina_id,))
+    iva = (p["iva_pct"] if p else db.setting_float("iva_defecte", 21)) - (p["irpf_pct"] if p else 0)
+    resta = pendent_facturar(feina_id)["total"]
+    return {"per_pagar": r2(per_pagar), "per_facturar": r2(resta * (1 + iva / 100)),
+            "total": r2(per_pagar + resta * (1 + iva / 100))}
+
+
+# --------------------------------------------------- estimació d'impostos
+
+def _rendiment(ini: str, fi: str) -> dict:
+    ing = db.row("SELECT COALESCE(SUM(base),0) AS base, COALESCE(SUM(irpf_import),0) AS ret FROM factures "
+                 "WHERE estat IN ('emesa','cobrada','anullada') AND numero IS NOT NULL AND data >= ? AND data < ?", (ini, fi))
+    desp = db.scalar("SELECT COALESCE(SUM(base),0) FROM despeses WHERE data >= ? AND data < ?", (ini, fi))
+    return {"ingressos": ing["base"], "despeses": desp, "retencions": ing["ret"]}
+
+
+def estimacio_trimestre(any_: int, trimestre: int, avui: str | None = None) -> dict:
+    """Estimació de l'IVA (303) i del pagament fraccionat d'IRPF (130) del trimestre.
+
+    Inclou el real fins avui i una projecció lineal a final de trimestre. És orientativa."""
+    from datetime import date
+    avui_d = date.fromisoformat(avui or db.today())
+    real = resum_impostos(any_, trimestre)
+    ini = date.fromisoformat(real["periode"]["inici"])
+    fi = date.fromisoformat(real["periode"]["fi"])
+    total_dies = (fi - ini).days
+    transcorreguts = min(max((avui_d - ini).days + 1, 0), total_dies)
+    factor = total_dies / transcorreguts if 0 < transcorreguts < total_dies else 1
+    en_curs = 0 < transcorreguts < total_dies
+
+    # IRPF model 130 (estimació directa): 20% del rendiment acumulat de l'any
+    pct = db.setting_float("irpf_fraccionat_pct", 20)
+
+    def quota_130(fins_tri: int, proj: float = 1.0) -> float:
+        fi_t = f"{any_ + 1}-01-01" if fins_tri == 4 else f"{any_}-{fins_tri * 3 + 1:02d}-01"
+        acum = _rendiment(f"{any_}-01-01", fi_t)
+        if proj != 1.0:
+            q = _rendiment(real["periode"]["inici"], real["periode"]["fi"])
+            acum = {k: acum[k] + q[k] * (proj - 1) for k in acum}
+        base = (acum["ingressos"] - acum["despeses"]) * pct / 100 - acum["retencions"]
+        anteriors = sum(max(quota_130(t), 0) for t in range(1, fins_tri)) if fins_tri > 1 else 0
+        return r2(max(base - anteriors, 0))
+
+    regim = db.setting("regim_fiscal", "autonom")
+    esborranys = db.row("SELECT COUNT(*) AS n, COALESCE(SUM(base),0) AS base, COALESCE(SUM(iva_import),0) AS iva "
+                        "FROM factures WHERE estat = 'esborrany'")
+    res = {
+        "any": any_, "trimestre": trimestre, "regim": regim, "en_curs": en_curs,
+        "dies": {"transcorreguts": transcorreguts, "total": total_dies},
+        "real": {"iva_repercutit": real["iva_repercutit"], "iva_suportat": real["iva_suportat"],
+                 "iva_resultat": real["resultat_iva"], "ingressos": real["ingressos"], "despeses": real["despeses"],
+                 "retencions": real["retencions_irpf"]},
+        "projeccio": {"iva_repercutit": r2(real["iva_repercutit"] * factor), "iva_suportat": r2(real["iva_suportat"] * factor),
+                      "iva_resultat": r2(real["resultat_iva"] * factor), "ingressos": r2(real["ingressos"] * factor),
+                      "despeses": r2(real["despeses"] * factor)},
+        "esborranys": esborranys,
+        "avis_tiquets": real["avis_tiquets"],
+    }
+    if regim == "autonom":
+        res["real"]["irpf_130"] = quota_130(trimestre)
+        res["projeccio"]["irpf_130"] = quota_130(trimestre, factor) if en_curs else res["real"]["irpf_130"]
+        res["irpf_pct"] = pct
+    return res
+
+
+# --------------------------------------------------- anàlisi de tancament
+
+def analisi_feina(feina_id: int) -> dict:
+    """Dades i conclusions objectives d'una feina per aprendre'n."""
+    from datetime import date
+    f = db.row("SELECT * FROM feines WHERE id = ?", (feina_id,))
+    r = resum_feina(feina_id)
+    pres = r["pressupostos"]
+    principal = sum(p["totals"]["base"] for p in pres if p["estat"] == "acceptat" and p["tipus"] == "principal")
+    extres = [p for p in pres if p["estat"] == "acceptat" and p["tipus"] == "extra"]
+    extres_import = sum(p["totals"]["base"] for p in extres)
+    marge_real = r2((r["contractat"] - r["cost_real"]) / r["contractat"] * 100) if r["contractat"] else None
+    cobraments = db.rows("SELECT data, cobrada_at FROM factures WHERE feina_id = ? AND estat = 'cobrada' AND cobrada_at IS NOT NULL", (feina_id,))
+    dies_cobrament = [(date.fromisoformat(c["cobrada_at"][:10]) - date.fromisoformat(c["data"][:10])).days for c in cobraments]
+    val = db.row("SELECT COUNT(*) AS n, AVG(puntuacio) AS mitjana FROM valoracions WHERE feina_id = ?", (feina_id,))
+    comentaris = [v["comentari"] for v in db.rows("SELECT comentari FROM valoracions WHERE feina_id = ? AND comentari <> ''", (feina_id,))]
+    durada = None
+    if f["data_inici"] and f["data_fi"]:
+        durada = (date.fromisoformat(f["data_fi"][:10]) - date.fromisoformat(f["data_inici"][:10])).days + 1
+
+    be, malament, propostes = [], [], []
+    tipus = f["tipus"] or "aquest tipus"
+    if marge_real is not None:
+        if marge_real >= r["marge_previst_pct"] - 2:
+            be.append(f"Marge real {marge_real:.1f}% (previst {r['marge_previst_pct']:.1f}%).")
+        else:
+            malament.append(f"Marge real {marge_real:.1f}%, per sota del previst ({r['marge_previst_pct']:.1f}%).")
+    if r["hores_previstes"]:
+        dh = (r["hores_reals"] / r["hores_previstes"] - 1) * 100
+        if dh > 10:
+            malament.append(f"Hores reals un {dh:.0f}% per sobre de les pressupostades ({r['hores_reals']:.1f} h vs {r['hores_previstes']:.1f} h).")
+            propostes.append(f"En feines de {tipus}, pressuposta un {dh:.0f}% més d'hores de mà d'obra.")
+        elif dh < -10:
+            be.append(f"S'han fet un {-dh:.0f}% menys d'hores de les previstes.")
+            propostes.append(f"En feines de {tipus} es pot ajustar el preu: es van fer menys hores de les previstes.")
+        else:
+            be.append("Les hores s'han ajustat al pressupost.")
+    for p in r["partides"]:
+        if p["previst"] and p["pct"] and p["pct"] > 110:
+            malament.append(f"Partida «{p['nom']}» desviada un {p['pct'] - 100:.0f}% (+{p['desviacio']:.2f} €).")
+            propostes.append(f"Revisa l'amidament i els preus de «{p['nom']}» en feines de {tipus}.")
+        elif not p["previst"] and p["real"] > 50:
+            malament.append(f"Cost no previst a «{p['nom']}»: {p['real']:.2f} €.")
+            propostes.append(f"Inclou la partida «{p['nom']}» als pressupostos de {tipus}.")
+    if principal and extres_import / principal > 0.1:
+        malament.append(f"Treballs fora de pressupost per {extres_import:.2f} € ({extres_import / principal * 100:.0f}% del principal).")
+        propostes.append("Fes una visita i un amidament més detallats abans de pressupostar: hi ha hagut molts canvis.")
+    elif extres:
+        be.append(f"Els canvis ({len(extres)}) s'han pressupostat i acceptat abans de fer-los.")
+    if r["pendent_facturar"] > 0.01:
+        malament.append(f"S'ha tancat amb {r['pendent_facturar']:.2f} € per facturar.")
+    if r["pendent_cobrar"] > 0.01:
+        malament.append(f"Queden {r['pendent_cobrar']:.2f} € pendents de cobrar.")
+    if dies_cobrament:
+        mitjana = sum(dies_cobrament) / len(dies_cobrament)
+        (be if mitjana <= 30 else malament).append(f"Cobrament mitjà en {mitjana:.0f} dies.")
+        if mitjana > 30:
+            propostes.append("Demana una bestreta en acceptar i factura per certificacions més freqüents.")
+    if val["n"]:
+        (be if val["mitjana"] >= 4 else malament).append(f"Valoració del client: {val['mitjana']:.1f}/5 ({val['n']}).")
+    return {
+        "feina": {"codi": f["codi"], "nom": f["nom"], "tipus": f["tipus"]},
+        "xifres": {"contractat": r["contractat"], "principal": r2(principal), "extres": r2(extres_import), "n_extres": len(extres),
+                   "cost_previst": r["cost_previst"], "cost_real": r["cost_real"], "marge_previst_pct": r["marge_previst_pct"],
+                   "marge_real_pct": marge_real, "hores_previstes": r["hores_previstes"], "hores_reals": r["hores_reals"],
+                   "facturat": r["facturat"], "cobrat": r["cobrat"], "pendent_facturar": r["pendent_facturar"],
+                   "durada_dies": durada, "dies_cobrament": r2(sum(dies_cobrament) / len(dies_cobrament)) if dies_cobrament else None,
+                   "valoracio": r2(val["mitjana"]) if val["n"] else None},
+        "partides": r["partides"],
+        "comentaris_client": comentaris,
+        "be": be, "malament": malament, "propostes": propostes,
+    }

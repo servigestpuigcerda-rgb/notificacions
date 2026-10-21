@@ -197,7 +197,12 @@ details summary { cursor: pointer; color: var(--blau); font-size: .9rem; margin:
 .cap-linies { display: none; }
 .linia { background: var(--sup); border: 1px solid var(--vora); border-radius: 12px; padding: 10px; margin-bottom: 8px;
   display: grid; gap: 8px; grid-template-columns: repeat(3, 1fr); position: relative; }
-.linia textarea { grid-column: 1 / -1; min-height: 44px; overflow: hidden; resize: none; font-weight: 500; padding-right: 74px; }
+.linia .desc-cel { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 6px; }
+.linia textarea { min-height: 44px; overflow: hidden; resize: none; font-weight: 500; padding-right: 74px; }
+.ref-fila { display: flex; gap: 6px; align-items: center; }
+.ref-fila input { text-align: left !important; font-size: .85rem; min-height: 36px; padding: 6px 8px; }
+.ref-fila label.btn-icon { display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.mini-foto { width: 44px; height: 44px; object-fit: cover; border-radius: 8px; flex: none; display: block; }
 .linia select { grid-column: 1 / -1; }
 .linia label.mob { display: flex; flex-direction: column; font-size: .72rem; color: var(--muted); gap: 2px; }
 .linia input { text-align: right; padding: 8px; }
@@ -208,7 +213,7 @@ details summary { cursor: pointer; color: var(--blau); font-size: .9rem; margin:
   .cap-linies, .linia { grid-template-columns: minmax(200px, 3fr) 1.3fr .7fr .6fr .9fr .7fr .9fr .6fr 1fr 70px; }
   .cap-linies { display: grid; gap: 8px; padding: 0 10px 6px; font-size: .75rem; color: var(--muted); text-transform: uppercase; }
   .linia { padding: 6px 10px; align-items: center; margin-bottom: 4px; border-radius: 10px; }
-  .linia textarea, .linia select, .linia .import { grid-column: auto; }
+  .linia .desc-cel, .linia select, .linia .import { grid-column: auto; }
   .linia textarea { padding-right: 12px; }
   .linia label.mob { font-size: 0; gap: 0; }
   .linia .ops { position: static; }
@@ -324,3 +329,43 @@ input.curt { width: 110px; flex: none; text-align: right; }
 .toast.error { background: var(--verm); }
 .toast.out { opacity: 0; transform: translateY(10px); }
 @media (min-width: 900px) { #toasts { bottom: 24px; } }
+
+/* ---------- assistent ---------- */
+.assistent-btn { margin: 0 8px 14px; }
+.barra-assistent { display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px 16px; margin-bottom: 12px; border-radius: var(--radi);
+  border: 2px solid var(--blau); background: var(--blau-clar); color: var(--text); font: inherit; font-size: 1.02rem; font-weight: 600; text-align: left; cursor: pointer; flex-wrap: wrap; }
+.barra-assistent span { font-size: 1.6rem; }
+.barra-assistent small { color: var(--muted); font-weight: 400; flex-basis: 100%; padding-left: 42px; margin-top: -8px; }
+.full .accio.destacada { background: var(--blau); color: #fff; border: 0; font: inherit; font-size: 1.05rem; font-weight: 600; cursor: pointer; text-align: left; }
+.accions-proposades { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 12px; }
+.accio-prop { border: 1px solid var(--vora); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.accio-prop label span { display: flex; flex-direction: column; }
+select.falta { border-color: var(--verm); }
+.bloquejos { margin: -6px 0 12px; }
+.avis-fila.verd-f { background: var(--verd-clar); border-color: var(--verd); }
+.avis-fila.vermell-f { background: var(--verm-clar); border-color: var(--verm); }
+.targeta.destacada { border: 2px solid var(--blau); }
+tr.destacat td { background: var(--blau-clar); }
+.foto-msg { display: block; max-width: 220px; max-height: 220px; border-radius: 10px; margin-top: 6px; }
+.estrelles { color: #f5a623; font-size: 1.1rem; letter-spacing: 1px; }
+
+/* ---------- planning i evolució ---------- */
+.planning .fila { flex-wrap: wrap; }
+.pl-info { flex: 1 1 220px; min-width: 0; }
+.planning select { width: auto; min-height: 36px; padding: 4px 8px; }
+.planning input.curt { width: 64px; min-height: 36px; padding: 4px 8px; }
+.evolucio { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.ev { background: var(--sup); border: 1px solid var(--vora); border-radius: 12px; padding: 10px; }
+.ev p { margin: 4px 0 8px; }
+.ev img { width: 100%; border-radius: 8px; display: block; aspect-ratio: 4 / 3; object-fit: cover; }
+
+/* ---------- maqueta 3D ---------- */
+.visor { width: 100%; height: 56vh; min-height: 300px; border-radius: 12px; overflow: hidden; background: #eef1f5; touch-action: none; }
+.visor.gran { height: 65vh; }
+.render-ed .barra-accions h2 { margin-right: auto; }
+.mat-fila { display: grid; grid-template-columns: 44px 1fr 96px 64px 1fr; gap: 6px; margin-bottom: 6px; align-items: center; }
+.mat-fila input[type=color] { padding: 2px; height: 40px; min-height: 0; }
+.mat-fila input, .mat-fila select { min-height: 40px; padding: 6px 8px; font-size: .88rem; }
+.elements-t input, .elements-t select { min-height: 36px; padding: 4px 6px; font-size: .85rem; min-width: 56px; }
+.elements-t td { padding: 4px; }
+@media (max-width: 640px) { .mat-fila { grid-template-columns: 44px 1fr 90px; } .mat-fila > :nth-child(4), .mat-fila > :nth-child(5) { grid-column: span 1; } }

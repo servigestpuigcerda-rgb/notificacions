@@ -1,5 +1,6 @@
 import { api, esc, errorToast, formData, get, post, state, toast } from "./core.js";
 import { vistaInici } from "./v-inici.js";
+import { obreAssistent } from "./assistent.js";
 import { vistaFeines, vistaFeina } from "./v-feines.js";
 import { vistaPressupost } from "./v-pressupost.js";
 import { vistaCaptura, vistaHores, vistaDictar } from "./v-captura.js";
@@ -47,6 +48,7 @@ function layout() {
   app.innerHTML = `
     <aside class="lateral">
       <div class="marca">${esc(state.empresa || "Gestió d'obres")}</div>
+      <button class="btn primari assistent-btn" data-assistent>🎙️ Digues què vols fer</button>
       <nav>${items.map(([r, t, i]) => `<a href="#/${r}" data-r="${r}"><span>${i}</span>${esc(t)}</a>`).join("")}</nav>
       <div class="peu-lateral">${esc(state.usuari.nom)} · <a href="#" data-logout>Surt</a></div>
     </aside>
@@ -65,19 +67,29 @@ function layout() {
     location.reload();
   };
   app.querySelector("[data-rapid]").onclick = accioRapida;
+  app.querySelector("[data-assistent]").onclick = () => obreAssistent(feinaActual());
 }
 
 export function accioRapida() {
   const fons = document.createElement("div");
   fons.className = "full-fons";
   fons.innerHTML = `<div class="full">
+      <button class="accio destacada" data-assist><span>🎙️</span>Digues què vols fer</button>
       <a href="#/captura" class="accio"><span>📷</span>Foto de tiquet o factura</a>
       <a href="#/hores" class="accio"><span>⏱️</span>Apuntar hores</a>
       <a href="#/dictar" class="accio"><span>🎤</span>Dictar un pressupost</a>
       <a href="#/feines?nova=1" class="accio"><span>🏗️</span>Nova feina</a>
       <button class="btn" data-tanca>Tanca</button></div>`;
-  fons.onclick = (e) => { if (e.target === fons || e.target.closest("a,[data-tanca]")) fons.remove(); };
+  fons.onclick = (e) => {
+    if (e.target.closest("[data-assist]")) { fons.remove(); obreAssistent(feinaActual()); return; }
+    if (e.target === fons || e.target.closest("a,[data-tanca]")) fons.remove();
+  };
   document.body.appendChild(fons);
+}
+
+export function feinaActual() {
+  const m = location.hash.match(/^#\/feina\/(\d+)/);
+  return m ? +m[1] : null;
 }
 
 async function pantallaAcces(configurat) {
