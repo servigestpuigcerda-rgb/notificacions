@@ -2,3 +2,10 @@
 __pycache__/
 *.pyc
 .playwright/
+
+# Tokens y datos de las cuentas externas del conector Servigest (nunca al repositorio)
+token_*.enc
+clave_tokens.key
+cuentas_externas.json
+accesos_externos.jsonl
+token_cache.bin

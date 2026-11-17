@@ -1,7 +1,12 @@
-# Correo Outlook para el conector Servigest: `buscar_correos` ampliada y `mover_correo` nueva
+# Correo Outlook para el conector Servigest: `buscar_correos` ampliada, `mover_correo` nueva y buzones de otra organización
 
 Código listo para integrar en el servidor MCP de Servigest (Python, FastMCP), que corre en el PC del Xavi.
-Va siempre contra `/me` con el **token delegado** de quien ha iniciado sesión. Así, cada persona (por ejemplo, Carles) trabaja con su propio buzón.
+Va siempre contra `/me` con el **token delegado** de la cuenta en uso. Por defecto, la de quien ha iniciado sesión: así cada persona (por ejemplo, Carles) trabaja con su propio buzón.
+
+Además, las herramientas aceptan `cuenta` para trabajar con un **buzón de otra organización**
+(p. ej. el de Carlos), con su propio token delegado guardado cifrado y aparte.
+Todo eso está en **[MULTIORGANIZACION.md](MULTIORGANIZACION.md)**: qué cambiar en Entra ID, el
+inicio de sesión de la cuenta externa, el parámetro `cuenta` y la parte de protección de datos.
 
 ## Cambios
 
@@ -12,6 +17,13 @@ Va siempre contra `/me` con el **token delegado** de quien ha iniciado sesión. 
 - Con texto, remitente o destinatario se usa `$search`. Graph **no permite combinar `$search` con `$filter`** en mensajes. En ese caso se piden más resultados y los no leídos se filtran en local.
 - Se combina con todos los filtros: carpeta, fechas, adjuntos, paginación con `continuar`.
 - La descripción incluye «resúmeme los correos que no he leído».
+
+**cuenta** (en las dos tools)
+- Sin `cuenta`, o con `cuenta="despacho"`: el buzón del usuario que ha iniciado sesión. Igual que antes.
+- Con el alias de un buzón externo registrado (`cuenta="carlos"`): ese buzón, con su propio token.
+- Alias desconocido → error que lista los buzones disponibles; nunca se usa otro buzón.
+- La respuesta dice qué buzón se ha usado (`buzon`), y si es externo añade `aviso_buzon`.
+- Detalles y herramientas de gestión (`cuentas_correo_listar`, `cuenta_externa_iniciar_sesion`…): [MULTIORGANIZACION.md](MULTIORGANIZACION.md).
 
 **mover_correo**: tool nueva
 - `correo_id` acepta un id, una lista de ids o ids separados por comas (máximo 50). Genera una sola vista previa.
@@ -50,7 +62,9 @@ Pruebas, con Graph simulado y sin red: `python -m pytest servigest_correo -q`
    - añade:
    ```python
    from servigest_correo.correo_graph import registrar as registrar_correo
+   from servigest_correo.cuentas import registrar as registrar_cuentas
    registrar_correo(mcp, obtener_graph)   # mcp = la instancia FastMCP del servidor
+   registrar_cuentas(mcp)                 # gestión de buzones de otras organizaciones
    ```
    `obtener_graph()` debe devolver el cliente Graph **del usuario de la petición**, el mismo que usan `leer_correo` y `crear_carpeta_correo`. Ese cliente necesita:
    - `get(ruta_o_url, params=None) -> dict` y `post(ruta, json=None) -> dict`, que acepten una URL absoluta (para el `@odata.nextLink`);

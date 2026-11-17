@@ -4,8 +4,14 @@ Contiene:
   - buscar_correos  (ampliada: solo_no_leidos + campo `leido` en cada correo)
   - mover_correo    (nueva: vista previa + confirmar=true, acepta uno o varios ids)
 
-Todo va contra /me con el token DELEGADO del usuario que ha iniciado sesión, así que cada persona
-(p. ej. Carles) trabaja con su propio buzón. Nunca se usa /users/{id} ni permisos de aplicación.
+Todo va contra /me con el token DELEGADO de la cuenta en uso, así que cada persona (p. ej. Carles)
+trabaja con su propio buzón. Nunca se usa /users/{id} ni permisos de aplicación.
+
+Las dos herramientas aceptan `cuenta`:
+  - sin `cuenta` (o «despacho»): el buzón del usuario que ha iniciado sesión en Servigest;
+  - con el alias de un buzón externo (p. ej. «carlos»): ese buzón de otra organización, con su
+    propio token delegado guardado cifrado aparte (ver `cuentas.py`).
+Un alias desconocido es un error: nunca se usa un buzón externo que no se haya pedido por su nombre.
 
 Integración: el servidor solo tiene que dar un objeto `graph` con dos métodos
     graph.get(ruta_o_url, params=None) -> dict
@@ -18,6 +24,9 @@ from __future__ import annotations
 
 import re
 from typing import Any, Callable
+
+from . import cuentas
+from .graph_cliente import GraphError  # se re-exporta: antes se definía en este módulo
 
 # Nombres estándar (well-known) de carpetas que Graph acepta directamente como id.
 CARPETAS_ESTANDAR = {
@@ -42,12 +51,6 @@ MSG_PERMISO = (
     "Azure, o el usuario aún no ha vuelto a iniciar sesión tras concederlo). Con solo Mail.Read se "
     "puede leer pero no mover. Avisa al administrador del despacho."
 )
-
-
-class GraphError(Exception):
-    def __init__(self, status: int, code: str = "", mensaje: str = ""):
-        super().__init__(f"{status} {code} {mensaje}".strip())
-        self.status, self.code, self.mensaje = status, code, mensaje
 
 
 def _es_error_permiso(e: Exception) -> bool:
@@ -354,33 +357,74 @@ def mover_correo(graph, correo_id, carpeta_destino: str, confirmar: bool = False
 # Registro en el servidor MCP
 # ------------------------------------------------------------------------------------------
 
+AYUDA_CUENTA = """cuenta: buzón sobre el que trabajar. Vacío o «despacho» = el buzón del usuario que ha iniciado
+        sesión en Servigest (es lo normal). Solo se usa otro buzón si el usuario lo pide
+        expresamente, y entonces hay que pasar su alias (mira cuentas_correo_listar)."""
+
 DESC_BUSCAR = """Busca correos en el buzón del usuario de Outlook. Úsala cuando pida «busca el correo de...», «el último
         correo de...», «qué me ha enviado...» o «resúmeme los correos que no he leído». Filtros opcionales:
         texto libre (asunto/cuerpo), remitente (nombre o email), destinatario, fechas desde/hasta (AAAA-MM-DD),
         solo_con_adjuntos, solo_no_leidos (true = solo los no leídos) y carpeta (inbox, sentitems, drafts,
         archive o id de listar_carpetas_correo; vacío = todo el buzón). Los filtros se pueden combinar.
         Devuelve por correo: id, fecha, asunto, remitente, leido (true/false) y lista de adjuntos (incluidos
-        los inline). Pagina con `continuar` (valor «siguiente»)."""
+        los inline). Pagina con `continuar` (valor «siguiente»).
+        """ + AYUDA_CUENTA
 
 DESC_MOVER = """Mueve uno o varios correos de Outlook del usuario a otra carpeta. correo_id: id de buscar_correos
         (o una lista de ids para mover varios de una vez). carpeta_destino: id de listar_carpetas_correo,
         nombre estándar (inbox, archive, deleteditems, junkemail...) o nombre/ruta de una carpeta propia
         («Clientes/2026»). Sin confirmar=true solo devuelve la vista previa (asunto, remitente, fecha, carpeta
-        actual y destino) que hay que enseñar al usuario. Al mover, Graph cambia el id: usa id_nuevo después."""
+        actual y destino) que hay que enseñar al usuario. Al mover, Graph cambia el id: usa id_nuevo después.
+        """ + AYUDA_CUENTA
+
+
+def con_cuenta(obtener_graph: Callable[[], Any], cuenta: str, herramienta: str):
+    """Resuelve el buzón pedido. Devuelve (graph, info, None) o (None, None, {"error": ...}).
+
+    Sin `cuenta` devuelve el buzón del despacho; con el alias de una cuenta externa, esa. Si el
+    alias no existe o no tiene sesión, devuelve error: nunca cae hacia atrás a otro buzón.
+    """
+    try:
+        graph, info = cuentas.resolver_cuenta(cuenta, obtener_graph, herramienta)
+        return graph, info, None
+    except (cuentas.CuentaNoValida, cuentas.SesionRequerida) as e:
+        return None, None, {"error": str(e), "cuenta_pedida": cuenta}
+
+
+def _marcar_buzon(res: dict, info: dict) -> dict:
+    """Deja claro en la respuesta qué buzón se ha usado (sobre todo en las vistas previas)."""
+    if not isinstance(res, dict):
+        return res
+    if info.get("tipo") == "externa":
+        res["buzon"] = f"{info['alias']} <{info.get('email', '')}>"
+        res["aviso_buzon"] = ("Buzón EXTERNO, de otra organización. Dilo al usuario al dar el "
+                              "resultado, para que no lo confunda con el del despacho.")
+    else:
+        res["buzon"] = "despacho"
+    return res
 
 
 def registrar(mcp, obtener_graph: Callable[[], Any]) -> None:
     """Registra las dos herramientas. `obtener_graph()` devuelve el cliente Graph del usuario actual
-    (el mismo que usan leer_correo, crear_carpeta_correo, etc.)."""
+    (el mismo que usan leer_correo, crear_carpeta_correo, etc.). El parámetro `cuenta` permite
+    además trabajar con un buzón externo registrado en `cuentas.py`."""
 
     @mcp.tool(name="buscar_correos", description=DESC_BUSCAR)
     def _buscar_correos(texto: str = "", remitente: str = "", destinatario: str = "",
                         desde: str = "", hasta: str = "", solo_con_adjuntos: bool = False,
                         solo_no_leidos: bool = False, carpeta: str = "", maximo: int = 10,
-                        continuar: str = "") -> dict:
-        return buscar_correos(obtener_graph(), texto, remitente, destinatario, desde, hasta,
-                              solo_con_adjuntos, solo_no_leidos, carpeta, maximo, continuar)
+                        continuar: str = "", cuenta: str = "") -> dict:
+        graph, info, error = con_cuenta(obtener_graph, cuenta, "buscar_correos")
+        if error:
+            return error
+        res = buscar_correos(graph, texto, remitente, destinatario, desde, hasta,
+                             solo_con_adjuntos, solo_no_leidos, carpeta, maximo, continuar)
+        return _marcar_buzon(res, info)
 
     @mcp.tool(name="mover_correo", description=DESC_MOVER)
-    def _mover_correo(correo_id: str | list[str], carpeta_destino: str, confirmar: bool = False) -> dict:
-        return mover_correo(obtener_graph(), correo_id, carpeta_destino, confirmar)
+    def _mover_correo(correo_id: str | list[str], carpeta_destino: str, confirmar: bool = False,
+                      cuenta: str = "") -> dict:
+        graph, info, error = con_cuenta(obtener_graph, cuenta, "mover_correo")
+        if error:
+            return error
+        return _marcar_buzon(mover_correo(graph, correo_id, carpeta_destino, confirmar), info)
